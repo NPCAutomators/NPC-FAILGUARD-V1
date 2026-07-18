@@ -86,26 +86,24 @@ On Linux, `requirements.sh` installs the system packages for you (asks for `sudo
 ### One-command install (recommended)
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/NPC-AUTOMATORS/NPC-FAILGUARD/main/scripts/bootstrap.sh | bash
+curl -fsSL https://raw.githubusercontent.com/NPC-AUTOMATORS/NPC-FAILGUARD/main/bootstrap.sh | bash
 ```
 
-Installs everything — the proxy daemon, and Claude Code itself if missing —
-with no prompts. The script pulls the latest `main` archive from GitHub
-(`NPC-AUTOMATORS/NPC-FAILGUARD`). Then open a new terminal, run `claude`, and
-type:
+Installs the proxy + Claude Code setup (if missing), **without** API keys.
+Then open a **new** terminal, run `claude`, and:
 
 ```
 /npc-failguard:setup <base-url> <key1 key2 ... or /path/to/keys.txt>
 ```
 
-That single in-Claude command adds your keys + provider and everything is
-live from that reply onward — no terminal setup, no restart.
+**New GitHub repo?** After you push, change the org/repo in that curl line
+to match, and set the same value in root `bootstrap.sh` (`GITHUB_REPO=…`)
+so the script downloads the matching archive.
 
-For offline or pre-push testing, override the archive URL:
+Offline / local test:
 
 ```bash
-NPC_FAILGUARD_TARBALL=file:///path/to/npc-failguard.tar.gz \
-  bash scripts/bootstrap.sh
+NPC_FAILGUARD_TARBALL=file:///path/to/npc-failguard.tar.gz bash bootstrap.sh
 ```
 
 Three commands, in order, from inside this folder. Every installer shows any error it
@@ -362,7 +360,8 @@ claude plugin marketplace remove npc-failguard-local
 |------|---------|
 | `requirements.sh` | Linux system packages (Python, curl, …) — first time only, uses sudo |
 | `install.sh` / `install.ps1` | Installer (venv, deps, service/task, Claude Code setup) |
-| `scripts/bootstrap.sh` | One-command curl installer (GitHub archive + raw bootstrap) |
+| `bootstrap.sh` | One-command curl installer (root — preferred raw URL target) |
+| `scripts/bootstrap.sh` | Thin wrapper → root `bootstrap.sh` (back-compat) |
 | `api-setup.sh` / `api-setup.ps1` | Add keys + base URL (re-run to switch provider) |
 | `uninstall.sh` / `uninstall.ps1` | Clean removal |
 | `README.md` | This file |

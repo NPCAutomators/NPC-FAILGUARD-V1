@@ -4,22 +4,32 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 
+RAW_CURL = (
+    "curl -fsSL https://raw.githubusercontent.com/NPC-AUTOMATORS/NPC-FAILGUARD/main/bootstrap.sh | bash"
+)
+ARCHIVE = (
+    "https://github.com/NPC-AUTOMATORS/NPC-FAILGUARD/archive/refs/heads/main.tar.gz"
+)
 
-def test_bootstrap_default_tarball_is_github_archive():
-    text = (ROOT / "scripts" / "bootstrap.sh").read_text(encoding="utf-8")
+
+def test_root_bootstrap_is_curl_entrypoint():
+    text = (ROOT / "bootstrap.sh").read_text(encoding="utf-8")
     assert "REPLACE-ME" not in text
-    assert (
-        "https://github.com/NPC-AUTOMATORS/NPC-FAILGUARD/archive/refs/heads/main.tar.gz"
-        in text
-    )
-    # Default is overridable for offline / pre-push tests.
-    assert "NPC_FAILGUARD_TARBALL" in text
+    assert "GITHUB_REPO=" in text
+    assert "NPC-AUTOMATORS/NPC-FAILGUARD" in text
+    assert "archive/refs/heads/" in text
+    assert "install.sh" in text
+    assert "--no-keys" in text
 
 
-def test_readme_documents_concrete_curl_install():
+def test_scripts_bootstrap_delegates_to_root():
+    text = (ROOT / "scripts" / "bootstrap.sh").read_text(encoding="utf-8")
+    assert "bootstrap.sh" in text
+    assert "REPLACE-ME" not in text
+
+
+def test_readme_documents_root_curl_install():
     text = (ROOT / "README.md").read_text(encoding="utf-8")
     assert "<YOUR-HOST-URL>" not in text
-    assert (
-        "curl -fsSL https://raw.githubusercontent.com/NPC-AUTOMATORS/NPC-FAILGUARD/main/scripts/bootstrap.sh | bash"
-        in text
-    )
+    assert RAW_CURL in text
+    assert "scripts/bootstrap.sh | bash" not in text  # prefer shorter root path
