@@ -12,9 +12,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+
       - name: Run installer (skip Claude Code in CI)
-        # echo. pipe feeds the "Press Enter to close" prompt so it never hangs
-        run: cmd /c "echo. | powershell -NoProfile -ExecutionPolicy Bypass -File install.ps1 -NoClaude"
+        # PSModulePath is cleared because the runner's pwsh pollutes it for
+        # Windows PowerShell 5.1; echo. feeds the "Press Enter" prompt.
+        run: cmd /c "set PSModulePath=&& echo. | powershell -NoProfile -ExecutionPolicy Bypass -File install.ps1 -NoClaude"
 
       - name: Wait for proxy to come up
         run: |
@@ -38,9 +42,10 @@ jobs:
           $s = Invoke-RestMethod http://127.0.0.1:8787/_npc-failguard/status
           if (@($s.keys).Count -lt 1) { throw "key did not appear after reload" }
 
-      - name: Statusline renders
+      - name: Statusline renders (Windows PowerShell 5.1)
         run: |
-          $out = '{"model":{"display_name":"CI"}}' | powershell -NoProfile -ExecutionPolicy Bypass -File scripts\statusline.ps1
+          '{"model":{"display_name":"CI"}}' | Set-Content -NoNewline "$env:TEMP\sl-in.json"
+          $out = cmd /c "set PSModulePath=&& powershell -NoProfile -ExecutionPolicy Bypass -File scripts\statusline.ps1 < %TEMP%\sl-in.json"
           Write-Host "statusline: $out"
           if (-not $out) { throw "statusline printed nothing" }
 
@@ -59,4 +64,4 @@ jobs:
           & core\.venv\Scripts\python.exe -m pytest tests/ -q
 
       - name: Uninstall cleanly
-        run: cmd /c "echo. | powershell -NoProfile -ExecutionPolicy Bypass -File uninstall.ps1 -Yes"
+        run: cmd /c "set PSModulePath=&& echo. | powershell -NoProfile -ExecutionPolicy Bypass -File uninstall.ps1 -Yes"
