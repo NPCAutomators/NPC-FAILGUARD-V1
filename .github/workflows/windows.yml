@@ -20,40 +20,42 @@ jobs:
         # Windows PowerShell 5.1; echo. feeds the "Press Enter" prompt.
         run: cmd /c "set PSModulePath=&& echo. | powershell -NoProfile -ExecutionPolicy Bypass -File install.ps1 -NoClaude"
 
-      - name: Start daemon directly (CI session cannot run at-logon tasks)
+      - name: Start daemon + exercise proxy (one step - CI kills bg procs between steps)
         run: |
-          Start-Process -FilePath (Join-Path $PWD "core\.venv\Scripts\python.exe") `
+          $py = Join-Path $PWD "core\.venv\Scripts\python.exe"
+          $proc = Start-Process -FilePath $py `
             -ArgumentList (Join-Path $PWD "core\main.py") -WorkingDirectory $PWD `
-            -RedirectStandardOutput daemon.out -RedirectStandardError daemon.err
+            -RedirectStandardOutput daemon.out -RedirectStandardError daemon.err -PassThru
+          try {
+            $ok = $false
+            foreach ($i in 1..30) {
+              try { Invoke-RestMethod http://127.0.0.1:8787/ -TimeoutSec 2 | Out-Null; $ok = $true; break }
+              catch { Start-Sleep 2 }
+            }
+            if (-not $ok) {
+              Write-Host "--- daemon.err ---"; Get-Content daemon.err -ErrorAction SilentlyContinue
+              Write-Host "--- daemon.out ---"; Get-Content daemon.out -ErrorAction SilentlyContinue
+              throw "proxy never answered on 8787"
+            }
+            Write-Host "proxy is up (pid $($proc.Id))"
 
-      - name: Wait for proxy to come up
-        run: |
-          $ok = $false
-          foreach ($i in 1..30) {
-            try {
-              Invoke-RestMethod http://127.0.0.1:8787/ -TimeoutSec 2 | Out-Null
-              $ok = $true; break
-            } catch { Start-Sleep 2 }
+            Write-Host "`n=== status (fresh install, 0 keys) ==="
+            Invoke-RestMethod http://127.0.0.1:8787/_npc-failguard/status | ConvertTo-Json -Depth 5
+
+            Write-Host "`n=== add dummy key + verify hot reload ==="
+            & $py core\manage.py add-key sk-ci-dummy-0123456789abcdef
+            & $py core\manage.py status
+            $s = Invoke-RestMethod http://127.0.0.1:8787/_npc-failguard/status
+            if (@($s.keys).Count -lt 1) { throw "key did not appear after reload" }
+
+            Write-Host "`n=== statusline renders (Windows PowerShell 5.1) ==="
+            '{"model":{"display_name":"CI"}}' | Set-Content -NoNewline "$env:TEMP\sl-in.json"
+            $out = cmd /c "set PSModulePath=&& powershell -NoProfile -ExecutionPolicy Bypass -File scripts\statusline.ps1 < %TEMP%\sl-in.json"
+            Write-Host "statusline: $out"
+            if (-not $out) { throw "statusline printed nothing" }
+          } finally {
+            Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue
           }
-          if (-not $ok) { throw "proxy never answered on 8787" }
-          Write-Host "proxy is up"
-
-      - name: Status endpoint (fresh install, 0 keys)
-        run: Invoke-RestMethod http://127.0.0.1:8787/_npc-failguard/status | ConvertTo-Json -Depth 5
-
-      - name: Add a dummy key via manage.py + verify hot reload
-        run: |
-          & core\.venv\Scripts\python.exe core\manage.py add-key sk-ci-dummy-0123456789abcdef
-          & core\.venv\Scripts\python.exe core\manage.py status
-          $s = Invoke-RestMethod http://127.0.0.1:8787/_npc-failguard/status
-          if (@($s.keys).Count -lt 1) { throw "key did not appear after reload" }
-
-      - name: Statusline renders (Windows PowerShell 5.1)
-        run: |
-          '{"model":{"display_name":"CI"}}' | Set-Content -NoNewline "$env:TEMP\sl-in.json"
-          $out = cmd /c "set PSModulePath=&& powershell -NoProfile -ExecutionPolicy Bypass -File scripts\statusline.ps1 < %TEMP%\sl-in.json"
-          Write-Host "statusline: $out"
-          if (-not $out) { throw "statusline printed nothing" }
 
       - name: Claude settings merge (claude-merge.py)
         run: |
