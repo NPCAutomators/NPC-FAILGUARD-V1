@@ -1,0 +1,62 @@
+name: Windows install test
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  windows-install:
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run installer (skip Claude Code in CI)
+        # echo. pipe feeds the "Press Enter to close" prompt so it never hangs
+        run: cmd /c "echo. | powershell -NoProfile -ExecutionPolicy Bypass -File install.ps1 -NoClaude"
+
+      - name: Wait for proxy to come up
+        run: |
+          $ok = $false
+          foreach ($i in 1..30) {
+            try {
+              Invoke-RestMethod http://127.0.0.1:8787/ -TimeoutSec 2 | Out-Null
+              $ok = $true; break
+            } catch { Start-Sleep 2 }
+          }
+          if (-not $ok) { throw "proxy never answered on 8787" }
+          Write-Host "proxy is up"
+
+      - name: Status endpoint (fresh install, 0 keys)
+        run: Invoke-RestMethod http://127.0.0.1:8787/_npc-failguard/status | ConvertTo-Json -Depth 5
+
+      - name: Add a dummy key via manage.py + verify hot reload
+        run: |
+          & core\.venv\Scripts\python.exe core\manage.py add-key sk-ci-dummy-0123456789abcdef
+          & core\.venv\Scripts\python.exe core\manage.py status
+          $s = Invoke-RestMethod http://127.0.0.1:8787/_npc-failguard/status
+          if (@($s.keys).Count -lt 1) { throw "key did not appear after reload" }
+
+      - name: Statusline renders
+        run: |
+          $out = '{"model":{"display_name":"CI"}}' | powershell -NoProfile -ExecutionPolicy Bypass -File scripts\statusline.ps1
+          Write-Host "statusline: $out"
+          if (-not $out) { throw "statusline printed nothing" }
+
+      - name: Claude settings merge (claude-merge.py)
+        run: |
+          & core\.venv\Scripts\python.exe scripts\claude-merge.py `
+            --settings "$env:TEMP\ci-settings.json" `
+            --claude-json "$env:TEMP\ci-claude.json" `
+            --statusline-cmd "powershell -File scripts\statusline.ps1" `
+            --plugin-dir "$PWD"
+          Get-Content "$env:TEMP\ci-settings.json"
+
+      - name: Run test suite on Windows
+        run: |
+          & core\.venv\Scripts\python.exe -m pip install --quiet -r core\requirements-dev.txt
+          & core\.venv\Scripts\python.exe -m pytest tests/ -q
+
+      - name: Uninstall cleanly
+        run: cmd /c "echo. | powershell -NoProfile -ExecutionPolicy Bypass -File uninstall.ps1 -Yes"
