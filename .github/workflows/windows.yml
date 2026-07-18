@@ -20,6 +20,12 @@ jobs:
         # Windows PowerShell 5.1; echo. feeds the "Press Enter" prompt.
         run: cmd /c "set PSModulePath=&& echo. | powershell -NoProfile -ExecutionPolicy Bypass -File install.ps1 -NoClaude"
 
+      - name: Start daemon directly (CI session cannot run at-logon tasks)
+        run: |
+          Start-Process -FilePath (Join-Path $PWD "core\.venv\Scripts\python.exe") `
+            -ArgumentList (Join-Path $PWD "core\main.py") -WorkingDirectory $PWD `
+            -RedirectStandardOutput daemon.out -RedirectStandardError daemon.err
+
       - name: Wait for proxy to come up
         run: |
           $ok = $false
@@ -65,3 +71,14 @@ jobs:
 
       - name: Uninstall cleanly
         run: cmd /c "set PSModulePath=&& echo. | powershell -NoProfile -ExecutionPolicy Bypass -File uninstall.ps1 -Yes"
+
+      - name: Diagnostics on failure
+        if: failure()
+        run: |
+          Write-Host "--- scheduled task info ---"
+          Get-ScheduledTaskInfo -TaskName "NPC FailGuard" -ErrorAction SilentlyContinue | Format-List
+          Write-Host "--- proxy.log ---"
+          Get-Content core\logs\proxy.log -Tail 50 -ErrorAction SilentlyContinue
+          Write-Host "--- daemon stderr/stdout ---"
+          Get-Content daemon.err -ErrorAction SilentlyContinue
+          Get-Content daemon.out -ErrorAction SilentlyContinue
