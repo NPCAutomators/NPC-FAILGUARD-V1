@@ -86,20 +86,27 @@ On Linux, `requirements.sh` installs the system packages for you (asks for `sudo
 ### One-command install (recommended)
 
 ```bash
-curl -fsSL <YOUR-HOST-URL>/bootstrap.sh | bash
+curl -fsSL https://raw.githubusercontent.com/NPC-AUTOMATORS/NPC-FAILGUARD/main/scripts/bootstrap.sh | bash
 ```
 
 Installs everything — the proxy daemon, and Claude Code itself if missing —
-with no prompts. Then open a new terminal, run `claude`, and type:
+with no prompts. The script pulls the latest `main` archive from GitHub
+(`NPC-AUTOMATORS/NPC-FAILGUARD`). Then open a new terminal, run `claude`, and
+type:
 
 ```
 /npc-failguard:setup <base-url> <key1 key2 ... or /path/to/keys.txt>
 ```
 
 That single in-Claude command adds your keys + provider and everything is
-live from that reply onward — no terminal setup, no restart. (Replace
-`<YOUR-HOST-URL>` with where you host `scripts/bootstrap.sh`, and set
-`TARBALL_URL` inside it.)
+live from that reply onward — no terminal setup, no restart.
+
+For offline or pre-push testing, override the archive URL:
+
+```bash
+NPC_FAILGUARD_TARBALL=file:///path/to/npc-failguard.tar.gz \
+  bash scripts/bootstrap.sh
+```
 
 Three commands, in order, from inside this folder. Every installer shows any error it
 hits and ends with **"Press any key to close"** — the terminal never slams shut on you.

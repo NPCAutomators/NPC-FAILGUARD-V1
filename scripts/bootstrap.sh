@@ -1,19 +1,16 @@
 #!/usr/bin/env bash
 # NPC FailGuard one-command installer (the curl target).
-#   curl -fsSL <HOST_URL>/bootstrap.sh | bash
+#   curl -fsSL https://raw.githubusercontent.com/NPC-AUTOMATORS/NPC-FAILGUARD/main/scripts/bootstrap.sh | bash
 # Downloads the app, installs everything (incl. Claude Code if missing),
 # and defers keys/provider to a single in-Claude command.
 set -euo pipefail
 
-# ==== EDIT BEFORE HOSTING ===================================================
-TARBALL_URL="${NPC_FAILGUARD_TARBALL:-https://REPLACE-ME.example.com/npc-failguard.tar.gz}"
-# ============================================================================
+# Default: GitHub source archive of main. Override with NPC_FAILGUARD_TARBALL for mirrors/tests.
+TARBALL_URL="${NPC_FAILGUARD_TARBALL:-https://github.com/NPC-AUTOMATORS/NPC-FAILGUARD/archive/refs/heads/main.tar.gz}"
 INSTALL_DIR="$HOME/.npc-failguard/app"
 KEEP_FILES="keys.json state.json provider.json api.txt stats.json pricing.json"
 
 echo "==> NPC FailGuard bootstrap"
-case "$TARBALL_URL" in *REPLACE-ME*) 
-    echo "[!] This bootstrap script has no download URL configured."; exit 1;; esac
 for dep in curl tar python3; do
     command -v "$dep" >/dev/null 2>&1 || {
         echo "[!] Missing dependency: $dep - install it and re-run."; exit 1; }
