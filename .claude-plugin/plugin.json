@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
+  "name": "npc-failguard",
+  "displayName": "NPC FailGuard",
+  "version": "2.2.0",
+  "description": "Manage the NPC FailGuard local proxy that transparently rotates multiple API keys for any Anthropic-compatible provider. Adds slash commands and an operator skill to check status, tail logs, restart, revive keys, and add/remove/replace keys or switch providers, plus live credit/cost tracking with a status-bar spend indicator — all without leaving Claude Code. Linux + Windows.",
+  "author": {
+    "name": "NPC Automators"
+  },
+  "keywords": [
+    "proxy",
+    "api-keys",
+    "key-rotation",
+    "anthropic",
+    "failover",
+    "reliability"
+  ],
+  "license": "Proprietary — see LICENSE"
+}

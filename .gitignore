@@ -1,0 +1,37 @@
+# --- Secrets (never commit) ---
+api.txt
+api*.txt
+*_keys.txt
+*keys*.txt
+aerolink_keys.txt
+freemodel*
+freemodel api.txt
+core/api.txt
+core/keys.json
+core/state.json
+core/provider.json
+core_legacy/
+.pre-dedupe-backup-*/
+*.bak
+*.backup
+*.backup.old
+
+# --- Runtime / logs ---
+core/stats.json
+core/pricing.json
+core/logs/
+*.log
+*.log.*
+
+# --- Python venv & caches ---
+core/.venv/
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+**/pyarmor_runtime_*/
+
+# --- Editor / OS / local agent cruft ---
+.DS_Store
+*.swp
+.claude/

@@ -1,0 +1,18 @@
+{
+  "keys": [
+    {
+      "key": "YOUR_API_KEY_1",
+      "label": "key-1",
+      "status": "active",
+      "dead_reason": null,
+      "last_used_at": null
+    },
+    {
+      "key": "YOUR_API_KEY_2",
+      "label": "key-2",
+      "status": "active",
+      "dead_reason": null,
+      "last_used_at": null
+    }
+  ]
+}

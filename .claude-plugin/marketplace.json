@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-marketplace.json",
+  "name": "npc-failguard-local",
+  "owner": {
+    "name": "NPC Automators"
+  },
+  "metadata": {
+    "description": "Local marketplace for the NPC FailGuard key-rotation proxy plugin."
+  },
+  "plugins": [
+    {
+      "name": "npc-failguard",
+      "source": ".",
+      "description": "Manage the NPC FailGuard API-key-rotating proxy from inside Claude Code."
+    }
+  ]
+}
