@@ -68,8 +68,9 @@ jobs:
 
       - name: Run test suite on Windows
         run: |
-          & core\.venv\Scripts\python.exe -m pip install --quiet -r core\requirements-dev.txt
-          & core\.venv\Scripts\python.exe -m pytest tests/ -q
+          $py = Join-Path $PWD "core\.venv\Scripts\python.exe"
+          uv pip install --quiet -r core\requirements-dev.txt --python $py
+          & $py -m pytest tests/ -q
 
       - name: Uninstall cleanly
         run: cmd /c "set PSModulePath=&& echo. | powershell -NoProfile -ExecutionPolicy Bypass -File uninstall.ps1 -Yes"
