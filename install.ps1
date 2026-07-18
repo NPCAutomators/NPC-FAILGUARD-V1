@@ -62,11 +62,12 @@ try {
     uv pip install --quiet -r (Join-Path $CoreDir "requirements.txt") --python $VenvPy
     Write-Host "[OK] Dependencies installed"
 
-    # ---- 3. Task Scheduler at-logon task (pythonw = no console window) ----
-    $PythonW = Join-Path $CoreDir ".venv\Scripts\pythonw.exe"
-    if (-not (Test-Path $PythonW)) { $PythonW = $VenvPy }  # fallback
-    $Action  = New-ScheduledTaskAction -Execute $PythonW `
-        -Argument "`"$CoreDir\main.py`"" -WorkingDirectory $CoreDir
+    # ---- 3. Task Scheduler at-logon task ----
+    # Launch via wscript + run-hidden.vbs: fully hidden, NO console window
+    # (a visible window invites an accidental close that kills the proxy).
+    $HiddenVbs = Join-Path $ScriptDir "scripts\run-hidden.vbs"
+    $Action  = New-ScheduledTaskAction -Execute "wscript.exe" `
+        -Argument "//B //Nologo `"$HiddenVbs`"" -WorkingDirectory $CoreDir
     $Trigger = New-ScheduledTaskTrigger -AtLogOn -User $env:USERNAME
     $Settings = New-ScheduledTaskSettingsSet `
         -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries `
