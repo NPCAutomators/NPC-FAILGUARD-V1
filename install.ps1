@@ -73,9 +73,17 @@ try {
         -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries `
         -RestartCount 3 -RestartInterval (New-TimeSpan -Minutes 1) `
         -ExecutionTimeLimit (New-TimeSpan -Days 3650)
+    # Stop any previous daemon (e.g. the old visible-console instance) so the
+    # fresh hidden one can bind the port, then overwrite the task (-Force -
+    # plain Unregister can silently fail and leave the old task behind).
+    try { Stop-ScheduledTask -TaskName $TaskName -ErrorAction SilentlyContinue } catch {}
+    Get-CimInstance Win32_Process -Filter "Name like 'python%'" -ErrorAction SilentlyContinue |
+        Where-Object { $_.CommandLine -like "*$CoreDir\main.py*" } |
+        ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
     Unregister-ScheduledTask -TaskName $TaskName -Confirm:$false -ErrorAction SilentlyContinue
     Register-ScheduledTask -TaskName $TaskName -Action $Action -Trigger $Trigger `
-        -Settings $Settings -Description "NPC FailGuard - API key rotating proxy" | Out-Null
+        -Settings $Settings -Description "NPC FailGuard - API key rotating proxy" `
+        -Force | Out-Null
     Write-Host "[OK] Scheduled task '$TaskName' registered (starts at logon)"
 
     # ---- 4. Log dir + start now ----
