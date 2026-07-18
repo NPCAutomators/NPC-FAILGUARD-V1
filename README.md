@@ -362,7 +362,7 @@ claude plugin marketplace remove npc-failguard-local
 |------|---------|
 | `requirements.sh` | Linux system packages (Python, curl, …) — first time only, uses sudo |
 | `install.sh` / `install.ps1` | Installer (venv, deps, service/task, Claude Code setup) |
-| `scripts/bootstrap.sh` | One-command curl installer (host this + a tarball) |
+| `scripts/bootstrap.sh` | One-command curl installer (GitHub archive + raw bootstrap) |
 | `api-setup.sh` / `api-setup.ps1` | Add keys + base URL (re-run to switch provider) |
 | `uninstall.sh` / `uninstall.ps1` | Clean removal |
 | `README.md` | This file |
@@ -390,9 +390,10 @@ claude plugin marketplace remove npc-failguard-local
 | `manage.py` | Key/provider management CLI (engine behind the slash commands) |
 | `requirements.txt` | Python runtime dependencies |
 | `requirements-dev.txt` | Test dependencies (pytest, respx) |
-| `keys.example.json` | Sample JSON format |
-| `keys.json` | Your keys (chmod 600, generated) |
-| `provider.json` | Base URL (generated) |
+| `keys.example.json` | Sample keys JSON format (placeholders only) |
+| `provider.example.json` | Sample provider.json (`base_url` only) |
+| `keys.json` | Your keys (chmod 600, generated — never commit) |
+| `provider.json` | Base URL (generated — never commit) |
 | `state.json` | Runtime state (auto-managed) |
 | `stats.json` | Usage counters + budget (auto-managed) |
 | `pricing.json` | USD rates per million tokens — editable |

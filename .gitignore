@@ -31,7 +31,9 @@ __pycache__/
 .pytest_cache/
 **/pyarmor_runtime_*/
 
-# --- Editor / OS / local agent cruft ---
+# --- Editor / OS / local agent / internal cruft ---
 .DS_Store
 *.swp
 .claude/
+PLAN-*.md
+**/__pycache__/
