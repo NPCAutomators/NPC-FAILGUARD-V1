@@ -40,10 +40,20 @@ def main():
     ap.add_argument("--settings", required=True)
     ap.add_argument("--claude-json", required=True)
     ap.add_argument("--port", default="8787")
-    ap.add_argument("--statusline-cmd", required=True,
+    ap.add_argument("--statusline-cmd", default=None,
                     help='full statusLine command, e.g. powershell -File "...statusline.ps1"')
+    ap.add_argument("--statusline-ps1", default=None,
+                    help="path to statusline.ps1; the command is built here "
+                         "(avoids PS 5.1 quote-mangling of paths with spaces)")
     ap.add_argument("--plugin-dir", required=True)
     a = ap.parse_args()
+
+    sl_cmd = a.statusline_cmd
+    if not sl_cmd and a.statusline_ps1:
+        sl_cmd = ('powershell -NoProfile -ExecutionPolicy Bypass -File "%s"'
+                  % a.statusline_ps1)
+    if not sl_cmd:
+        ap.error("need --statusline-cmd or --statusline-ps1")
 
     # ---- settings.json ----
     data, broken = load(a.settings)
@@ -64,7 +74,7 @@ def main():
     # statusLine: only set if the user has none yet or the existing one is ours
     sl = data.get("statusLine")
     if not sl or "npc-failguard" in json.dumps(sl) or "statusline" in json.dumps(sl):
-        new_sl = {"type": "command", "command": a.statusline_cmd, "padding": 0}
+        new_sl = {"type": "command", "command": sl_cmd, "padding": 0}
         if sl != new_sl:
             data["statusLine"] = new_sl
             changed.add("statusLine")

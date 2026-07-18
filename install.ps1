@@ -132,14 +132,15 @@ try {
         }
 
         # Merge proxy env + statusline + plugin + onboarding via the venv python
-        # (same engine as Linux; avoids PS 5.1 JSON quirks, never clobbers)
+        # (same engine as Linux; avoids PS 5.1 JSON quirks, never clobbers).
+        # Pass the ps1 PATH only - PS 5.1 mangles embedded quotes when the
+        # path contains spaces (e.g. usernames like "Insha - allah").
         $StatuslinePs1 = Join-Path $ScriptDir "scripts\statusline.ps1"
         $MergePy       = Join-Path $ScriptDir "scripts\claude-merge.py"
-        $SlCmd = "powershell -NoProfile -ExecutionPolicy Bypass -File `"$StatuslinePs1`""
         & $VenvPy $MergePy `
             --settings (Join-Path $env:USERPROFILE ".claude\settings.json") `
             --claude-json (Join-Path $env:USERPROFILE ".claude.json") `
-            --statusline-cmd $SlCmd `
+            --statusline-ps1 $StatuslinePs1 `
             --plugin-dir $ScriptDir
         if ($LASTEXITCODE -ne 0) {
             Write-Host "[!] Claude Code settings merge reported an error (see above)."

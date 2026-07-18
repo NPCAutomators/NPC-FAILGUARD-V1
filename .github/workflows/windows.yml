@@ -59,12 +59,20 @@ jobs:
 
       - name: Claude settings merge (claude-merge.py)
         run: |
+          # space in the dir name mimics usernames like "Insha - allah"
+          $Spaced = Join-Path $env:TEMP "npc ci - test"
+          New-Item -ItemType Directory -Force $Spaced | Out-Null
+          Copy-Item scripts\statusline.ps1 (Join-Path $Spaced "statusline.ps1")
           & core\.venv\Scripts\python.exe scripts\claude-merge.py `
-            --settings "$env:TEMP\ci-settings.json" `
-            --claude-json "$env:TEMP\ci-claude.json" `
-            --statusline-cmd "powershell -File scripts\statusline.ps1" `
+            --settings (Join-Path $Spaced "ci-settings.json") `
+            --claude-json (Join-Path $Spaced "ci-claude.json") `
+            --statusline-ps1 (Join-Path $Spaced "statusline.ps1") `
             --plugin-dir "$PWD"
-          Get-Content "$env:TEMP\ci-settings.json"
+          Get-Content (Join-Path $Spaced "ci-settings.json")
+          $cfg = Get-Content (Join-Path $Spaced "ci-settings.json") -Raw | ConvertFrom-Json
+          if ($cfg.env.ANTHROPIC_BASE_URL -ne "http://127.0.0.1:8787") { throw "proxy env missing" }
+          $cj = Get-Content (Join-Path $Spaced "ci-claude.json") -Raw | ConvertFrom-Json
+          if (-not $cj.hasCompletedOnboarding) { throw "onboarding bypass missing" }
 
       - name: Run test suite on Windows
         run: |
