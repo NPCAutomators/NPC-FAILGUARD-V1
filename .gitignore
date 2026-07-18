@@ -1,11 +1,9 @@
 # --- Secrets (never commit) ---
 api.txt
 api*.txt
+*api*.txt
 *_keys.txt
 *keys*.txt
-aerolink_keys.txt
-freemodel*
-freemodel api.txt
 core/api.txt
 core/keys.json
 core/state.json

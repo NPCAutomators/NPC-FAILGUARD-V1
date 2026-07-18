@@ -5,10 +5,10 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 
 RAW_CURL = (
-    "curl -fsSL https://raw.githubusercontent.com/NPC-AUTOMATORS/NPC-FAILGUARD/main/bootstrap.sh | bash"
+    "curl -fsSL https://raw.githubusercontent.com/NPCAutomators/NPC-FAILGUARD-V1/main/bootstrap.sh | bash"
 )
 ARCHIVE = (
-    "https://github.com/NPC-AUTOMATORS/NPC-FAILGUARD/archive/refs/heads/main.tar.gz"
+    "https://github.com/NPCAutomators/NPC-FAILGUARD-V1/archive/refs/heads/main.tar.gz"
 )
 
 
@@ -16,7 +16,7 @@ def test_root_bootstrap_is_curl_entrypoint():
     text = (ROOT / "bootstrap.sh").read_text(encoding="utf-8")
     assert "REPLACE-ME" not in text
     assert "GITHUB_REPO=" in text
-    assert "NPC-AUTOMATORS/NPC-FAILGUARD" in text
+    assert "NPCAutomators/NPC-FAILGUARD-V1" in text
     assert "archive/refs/heads/" in text
     assert "install.sh" in text
     assert "--no-keys" in text

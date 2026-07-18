@@ -86,7 +86,7 @@ On Linux, `requirements.sh` installs the system packages for you (asks for `sudo
 ### One-command install (recommended)
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/NPC-AUTOMATORS/NPC-FAILGUARD/main/bootstrap.sh | bash
+curl -fsSL https://raw.githubusercontent.com/NPCAutomators/NPC-FAILGUARD-V1/main/bootstrap.sh | bash
 ```
 
 Installs the proxy + Claude Code setup (if missing), **without** API keys.
@@ -96,9 +96,8 @@ Then open a **new** terminal, run `claude`, and:
 /npc-failguard:setup <base-url> <key1 key2 ... or /path/to/keys.txt>
 ```
 
-**New GitHub repo?** After you push, change the org/repo in that curl line
-to match, and set the same value in root `bootstrap.sh` (`GITHUB_REPO=…`)
-so the script downloads the matching archive.
+(Forked or renamed the repo? Set `NPC_FAILGUARD_GITHUB_REPO=<org>/<repo>` before
+running, or edit `GITHUB_REPO=` at the top of `bootstrap.sh`.)
 
 Offline / local test:
 
@@ -178,10 +177,11 @@ The plugin adds slash commands + an operator skill so you can manage the proxy f
 inside Claude Code. The daemon must already be installed (steps above).
 
 ```bash
-claude plugin marketplace add "/home/npc/Desktop/NPC FailGuard"
+claude plugin marketplace add "/path/to/NPC FailGuard"
 claude plugin install npc-failguard@npc-failguard-local
 ```
-(On Windows, use this folder's path instead.) Restart Claude Code (or start a new
+(Use the folder you cloned/downloaded this repo into; the one-command installer
+registers the plugin for you automatically.) Restart Claude Code (or start a new
 session), then check:
 ```bash
 claude plugin list          # should show: npc-failguard@npc-failguard-local  ✔ enabled

@@ -1,14 +1,14 @@
 #!/usr/bin/env bash
 # NPC FailGuard — one-command installer (curl entrypoint)
 #
-#   curl -fsSL https://raw.githubusercontent.com/NPC-AUTOMATORS/NPC-FAILGUARD/main/bootstrap.sh | bash
+#   curl -fsSL https://raw.githubusercontent.com/NPCAutomators/NPC-FAILGUARD-V1/main/bootstrap.sh | bash
 #
 # If you publish under a different GitHub org/repo, change GITHUB_REPO below
 # (or set NPC_FAILGUARD_GITHUB_REPO) and the matching line in README.md.
 set -euo pipefail
 
 # --- identity (edit when the public GitHub repo changes) --------------------
-GITHUB_REPO="${NPC_FAILGUARD_GITHUB_REPO:-NPC-AUTOMATORS/NPC-FAILGUARD}"
+GITHUB_REPO="${NPC_FAILGUARD_GITHUB_REPO:-NPCAutomators/NPC-FAILGUARD-V1}"
 GITHUB_BRANCH="${NPC_FAILGUARD_GITHUB_BRANCH:-main}"
 # ---------------------------------------------------------------------------
 
