@@ -54,20 +54,32 @@ try {
             Write-Host "[OK] Stopped daemon process (PID $($_.ProcessId))"
         }
 
-    # ---- 2. Revert the settings.json env keys we set (leave everything else) ----
+    # ---- 2. Revert the settings.json keys we set (leave everything else) ----
+    # PSCustomObject ops only - ConvertFrom-Json -AsHashtable needs PS 7.
     $Settings = Join-Path $env:USERPROFILE ".claude\settings.json"
     if (Test-Path $Settings) {
         try {
-            $data = Get-Content $Settings -Raw | ConvertFrom-Json -AsHashtable
-            if ($data.ContainsKey("env") -and
-                "$($data['env']['ANTHROPIC_BASE_URL'])".StartsWith("http://127.0.0.1:87")) {
+            $data = Get-Content $Settings -Raw | ConvertFrom-Json
+            $touched = $false
+            if ($data.env -and
+                "$($data.env.ANTHROPIC_BASE_URL)".StartsWith("http://127.0.0.1:87")) {
                 foreach ($k in @("ANTHROPIC_BASE_URL", "ANTHROPIC_API_KEY",
                                  "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC")) {
-                    $data["env"].Remove($k) | Out-Null
+                    $data.env.PSObject.Properties.Remove($k)
                 }
-                if ($data["env"].Count -eq 0) { $data.Remove("env") | Out-Null }
+                if (-not @($data.env.PSObject.Properties).Count) {
+                    $data.PSObject.Properties.Remove("env")
+                }
+                $touched = $true
+            }
+            if ($data.statusLine -and
+                ("$($data.statusLine.command)" -match "statusline")) {
+                $data.PSObject.Properties.Remove("statusLine")
+                $touched = $true
+            }
+            if ($touched) {
                 $data | ConvertTo-Json -Depth 10 | Set-Content $Settings -Encoding UTF8
-                Write-Host "[OK] Reverted npc-failguard env keys in $Settings"
+                Write-Host "[OK] Reverted npc-failguard keys in $Settings"
             }
         } catch {
             Write-Host "[!] Could not update ${Settings}: $_"

@@ -100,25 +100,21 @@ try {
             }
         }
 
-        # Merge proxy env into settings.json (never clobber other settings)
-        $SettingsDir = Join-Path $env:USERPROFILE ".claude"
-        $Settings    = Join-Path $SettingsDir "settings.json"
-        New-Item -ItemType Directory -Force $SettingsDir | Out-Null
-        $data = @{}
-        if (Test-Path $Settings) {
-            try { $data = Get-Content $Settings -Raw | ConvertFrom-Json -AsHashtable }
-            catch {
-                Move-Item $Settings "$Settings.broken" -Force
-                Write-Host "[!] Existing settings.json was invalid JSON; moved to settings.json.broken"
-                $data = @{}
-            }
+        # Merge proxy env + statusline + plugin + onboarding via the venv python
+        # (same engine as Linux; avoids PS 5.1 JSON quirks, never clobbers)
+        $StatuslinePs1 = Join-Path $ScriptDir "scripts\statusline.ps1"
+        $MergePy       = Join-Path $ScriptDir "scripts\claude-merge.py"
+        $SlCmd = "powershell -NoProfile -ExecutionPolicy Bypass -File `"$StatuslinePs1`""
+        & $VenvPy $MergePy `
+            --settings (Join-Path $env:USERPROFILE ".claude\settings.json") `
+            --claude-json (Join-Path $env:USERPROFILE ".claude.json") `
+            --statusline-cmd $SlCmd `
+            --plugin-dir $ScriptDir
+        if ($LASTEXITCODE -ne 0) {
+            Write-Host "[!] Claude Code settings merge reported an error (see above)."
+        } else {
+            Write-Host "[OK] Claude Code configured (proxy routing + statusline + plugin)"
         }
-        if (-not $data.ContainsKey("env")) { $data["env"] = @{} }
-        $data["env"]["ANTHROPIC_BASE_URL"] = "http://127.0.0.1:8787"
-        $data["env"]["ANTHROPIC_API_KEY"] = "npc-failguard-proxy-ignores-this"
-        $data["env"]["CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC"] = "1"
-        $data | ConvertTo-Json -Depth 10 | Set-Content $Settings -Encoding UTF8
-        Write-Host "[OK] $Settings configured (routes Claude Code through the proxy)"
     }
 
     Write-Host ""

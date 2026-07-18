@@ -147,6 +147,23 @@ sends one tiny real request, so it uses a small amount of provider credit).
 
 ## Install on Windows
 
+### One-command install (recommended)
+
+From PowerShell:
+
+```powershell
+irm https://raw.githubusercontent.com/NPCAutomators/NPC-FAILGUARD-V1/main/bootstrap.ps1 | iex
+```
+
+Installs the proxy + Claude Code setup (if missing), **without** API keys.
+Then open a **new** terminal, run `claude`, and:
+
+```
+/npc-failguard:setup <base-url> <key1 key2 ... or C:\path\keys.txt>
+```
+
+### Manual install
+
 From PowerShell, inside this folder:
 
 ### Step 1 — install
@@ -158,7 +175,8 @@ machine doesn't have it), installs dependencies, registers the **Task Scheduler*
 `NPC FailGuard` (starts at logon, auto-restarts on failure, no console window), starts
 the daemon, auto-installs Claude Code if missing (`irm https://claude.ai/install.ps1 | iex`,
 winget fallback), and configures `%USERPROFILE%\.claude\settings.json` the same way as
-Linux. Skip the Claude Code step with `-NoClaude`.
+Linux — proxy routing, the status-bar credit indicator, plugin registration, and
+onboarding skip. Skip the Claude Code step with `-NoClaude`.
 
 ### Step 2 — add your keys + provider
 ```powershell
@@ -360,7 +378,8 @@ claude plugin marketplace remove npc-failguard-local
 |------|---------|
 | `requirements.sh` | Linux system packages (Python, curl, …) — first time only, uses sudo |
 | `install.sh` / `install.ps1` | Installer (venv, deps, service/task, Claude Code setup) |
-| `bootstrap.sh` | One-command curl installer (root — preferred raw URL target) |
+| `bootstrap.sh` | One-command curl installer, Linux (root — preferred raw URL target) |
+| `bootstrap.ps1` | One-command `irm | iex` installer, Windows |
 | `scripts/bootstrap.sh` | Thin wrapper → root `bootstrap.sh` (back-compat) |
 | `api-setup.sh` / `api-setup.ps1` | Add keys + base URL (re-run to switch provider) |
 | `uninstall.sh` / `uninstall.ps1` | Clean removal |
@@ -379,7 +398,9 @@ claude plugin marketplace remove npc-failguard-local
 | `scripts/health-check.sh` | One-line proxy status probe |
 | `scripts/service.sh` / `service.ps1` | Platform-aware daemon control (start/stop/restart/is-active/wait-ready) |
 | `scripts/setup-claude-code.sh` | Claude Code auto-install + settings.json merge (Linux) |
+| `scripts/claude-merge.py` | Same settings/onboarding merge, used by `install.ps1` (Windows) |
 | `scripts/statusline.sh` | Status-bar line: live spend / remaining / key states / model |
+| `scripts/statusline.ps1` | Windows-native statusline (same output) |
 
 ### `core/` — implementation (you don't need to touch this)
 | File | Purpose |

@@ -33,3 +33,17 @@ def test_readme_documents_root_curl_install():
     assert "<YOUR-HOST-URL>" not in text
     assert RAW_CURL in text
     assert "scripts/bootstrap.sh | bash" not in text  # prefer shorter root path
+
+
+def test_windows_bootstrap_matches_repo():
+    text = (ROOT / "bootstrap.ps1").read_text(encoding="utf-8")
+    assert "REPLACE-ME" not in text
+    assert "NPCAutomators/NPC-FAILGUARD-V1" in text
+    assert "install.ps1" in text
+
+
+def test_windows_merge_helper_exists():
+    text = (ROOT / "scripts" / "claude-merge.py").read_text(encoding="utf-8")
+    assert "hasCompletedOnboarding" in text
+    assert "statusLine" in text
+    assert "npc-failguard-proxy-ignores-this" in text
