@@ -101,9 +101,18 @@ class KeyStore:
     # ---------- persistence ----------
 
     def load(self) -> None:
-        """(Re)load keys.json and merge any existing state.json on top."""
-        with open(self.keys_file, "r", encoding="utf-8") as f:
-            key_defs = json.load(f).get("keys", [])
+        """(Re)load keys.json and merge any existing state.json on top.
+
+        A missing/empty keys.json is normal on a fresh install (keys arrive
+        later via setup + /reload) - start with zero keys instead of crashing.
+        """
+        try:
+            with open(self.keys_file, "r", encoding="utf-8") as f:
+                key_defs = json.load(f).get("keys", [])
+        except (OSError, ValueError):
+            log.warning("no keys.json yet (%s) - starting with 0 keys; "
+                        "run setup to add keys", self.keys_file)
+            key_defs = []
 
         self.labels = [d.get("label", f"key-{i+1}") for i, d in enumerate(key_defs)]
         self.entries = [_new_state_entry(d["key"]) for d in key_defs]

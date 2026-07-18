@@ -100,6 +100,37 @@ try {
             }
         }
 
+        # The installer drops claude.exe in known dirs but the PATH change only
+        # reaches NEW terminals (and sometimes not at all) - fix it explicitly.
+        if (-not (Get-Command claude -ErrorAction SilentlyContinue)) {
+            $ClaudeDirs = @(
+                (Join-Path $env:USERPROFILE ".local\bin"),
+                (Join-Path $env:LOCALAPPDATA "Programs\claude"),
+                (Join-Path $env:LOCALAPPDATA "Microsoft\WinGet\Links")
+            )
+            foreach ($d in $ClaudeDirs) {
+                if (Test-Path (Join-Path $d "claude.exe")) {
+                    $env:Path = "$d;$env:Path"
+                    $UserPath = [Environment]::GetEnvironmentVariable("Path", "User")
+                    if (-not $UserPath) { $UserPath = "" }
+                    if (($UserPath -split ";") -notcontains $d) {
+                        [Environment]::SetEnvironmentVariable("Path", "$d;$UserPath", "User")
+                        Write-Host "[OK] Added $d to your user PATH"
+                    }
+                    break
+                }
+            }
+        }
+        $claude = Get-Command claude -ErrorAction SilentlyContinue
+        if ($claude) {
+            Write-Host "[OK] claude found at: $($claude.Source)"
+            Write-Host "    (open a NEW terminal window if 'claude' is not recognized elsewhere)"
+        } else {
+            Write-Host "[!] 'claude' still not on PATH."
+            Write-Host "    Open a brand NEW terminal window and try 'claude' again."
+            Write-Host "    If it is still missing, run:  irm https://claude.ai/install.ps1 | iex"
+        }
+
         # Merge proxy env + statusline + plugin + onboarding via the venv python
         # (same engine as Linux; avoids PS 5.1 JSON quirks, never clobbers)
         $StatuslinePs1 = Join-Path $ScriptDir "scripts\statusline.ps1"
