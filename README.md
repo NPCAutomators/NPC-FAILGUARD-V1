@@ -1,29 +1,65 @@
-```
-╔══════════════════════════════════════════════╗
-║              N P C   F A I L G U A R D         ║
-║      Never-drop API key failover proxy         ║
-╚══════════════════════════════════════════════╝
-                                by NPC Automators
-```
+<div align="center">
+
+<img src="assets/banner.svg" alt="NPC FailGuard — never-drop API key failover proxy" width="100%">
 
 # NPC FailGuard
 
-> **Never-drop API key failover for Claude & Anthropic-compatible APIs.**
+**Never-drop API-key failover for Claude Code & Anthropic-compatible APIs.**
+
+[![Windows](https://github.com/NPCAutomators/NPC-FAILGUARD-V1/actions/workflows/windows.yml/badge.svg)](https://github.com/NPCAutomators/NPC-FAILGUARD-V1/actions/workflows/windows.yml)
+[![Linux](https://github.com/NPCAutomators/NPC-FAILGUARD-V1/actions/workflows/linux.yml/badge.svg)](https://github.com/NPCAutomators/NPC-FAILGUARD-V1/actions/workflows/linux.yml)
+![Python](https://img.shields.io/badge/python-3.10%2B-3776AB?logo=python&logoColor=white)
+![Platforms](https://img.shields.io/badge/platform-Linux%20%7C%20Windows-444)
+![License](https://img.shields.io/badge/license-proprietary-8A2BE2)
+
+*One key dies → the next takes over, mid-request. No restart, no lost context.*
+
+</div>
+
+---
+
+## Quick start
+
+**Linux**
+```bash
+curl -fsSL https://raw.githubusercontent.com/NPCAutomators/NPC-FAILGUARD-V1/main/bootstrap.sh | bash
+```
+
+**Windows (PowerShell)**
+```powershell
+irm https://raw.githubusercontent.com/NPCAutomators/NPC-FAILGUARD-V1/main/bootstrap.ps1 | iex
+```
+
+Then open a **new** terminal, run `claude`, and add your provider + keys:
+```
+/npc-failguard:setup <base-url> <key1 key2 ... or /path/to/keys.txt>
+```
+That's it — Claude Code now routes through the proxy, keys rotate automatically, and
+the status bar shows live spend.
+
+---
+
+## What it does
 
 A local proxy that transparently rotates multiple API keys for any
-Anthropic-compatible provider (Anthropic, or any compatible endpoint).
-
-When one key returns `401` / `402` / `429` / `5xx`, the proxy silently retries the
-same request with the next key — no restart, no lost context. Claude Code (or any
+Anthropic-compatible provider. When one key returns `401` / `402` / `429` / `5xx`,
+the proxy silently retries the same request with the next key. Claude Code (or any
 Anthropic-compatible client) points at `http://127.0.0.1:8787` and never notices the
 swap; it just sees a slightly delayed `200`.
+
+- 🔁 **Automatic failover** — dead / throttled / exhausted keys are skipped and self-revive
+- 🧠 **Zero-touch install** — auto-installs Claude Code, skips onboarding, registers the plugin
+- 💸 **Live cost tracking** — passive token→USD counter + budget in the Claude Code status bar
+- 🖥️ **Cross-platform** — Linux (systemd) and Windows (hidden background daemon), tested in CI on both, on every push
+- 🔒 **Local-only** — binds to `127.0.0.1`; your keys never leave the machine
 
 **© 2026 NPC Automators. Proprietary — personal use only. See [LICENSE](LICENSE).**
 Bring your own API keys. You are responsible for complying with your provider's terms.
 
 ---
 
-## Table of contents
+<details>
+<summary><b>Table of contents</b></summary>
 
 1. [How it works](#how-it-works)
 2. [Requirements](#requirements)
@@ -37,23 +73,23 @@ Bring your own API keys. You are responsible for complying with your provider's 
 10. [Uninstall](#uninstall)
 11. [Files](#files)
 
+</details>
+
 ---
 
 ## How it works
 
-```
-Claude Code
-   |  ANTHROPIC_BASE_URL=http://127.0.0.1:8787
-   v
-NPC FailGuard proxy  ──►  provider base URL (with key #1)
-   |  on 401/402/429/5xx: mark key #1 (dead / throttled / exhausted)
-   v
-NPC FailGuard proxy  ──►  provider base URL (with key #2)   ✅ transparent retry
+```mermaid
+flowchart LR
+    CC["Claude Code<br/><sub>ANTHROPIC_BASE_URL = 127.0.0.1:8787</sub>"] --> P["NPC FailGuard<br/>proxy"]
+    P -- "request with key #1" --> API["Provider API"]
+    API -. "401 / 402 / 429 / 5xx" .-> P
+    P -- "same request, key #2 → 200 ✅" --> API
 ```
 
 The daemon runs in the background — via **systemd** (user service, no root) on Linux,
-via a **Task Scheduler** at-logon task on Windows — and survives logout/reboot.
-Each key has a state:
+via a **hidden autostart entry** (per-user Run key, no admin rights, no console
+window) on Windows — and survives logout/reboot. Each key has a state:
 
 | State | Meaning | Recovers |
 |-------|---------|----------|
@@ -104,6 +140,8 @@ Offline / local test:
 ```bash
 NPC_FAILGUARD_TARBALL=file:///path/to/npc-failguard.tar.gz bash bootstrap.sh
 ```
+
+### Manual install
 
 Three commands, in order, from inside this folder. Every installer shows any error it
 hits and ends with **"Press any key to close"** — the terminal never slams shut on you.
@@ -171,9 +209,9 @@ From PowerShell, inside this folder:
 powershell -ExecutionPolicy Bypass -File install.ps1
 ```
 Installs `uv` if missing, creates the venv (downloads Python 3.10+ automatically if the
-machine doesn't have it), installs dependencies, registers the **Task Scheduler** task
-`NPC FailGuard` (starts at logon, auto-restarts on failure, no console window), starts
-the daemon, auto-installs Claude Code if missing (`irm https://claude.ai/install.ps1 | iex`,
+machine doesn't have it), installs dependencies, registers a **hidden autostart entry**
+(per-user Run key — no admin rights needed, no console window to accidentally close),
+starts the daemon, auto-installs Claude Code if missing (`irm https://claude.ai/install.ps1 | iex`,
 winget fallback), and configures `%USERPROFILE%\.claude\settings.json` the same way as
 Linux — proxy routing, the status-bar credit indicator, plugin registration, and
 onboarding skip. Skip the Claude Code step with `-NoClaude`.

@@ -1,0 +1,43 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="260" viewBox="0 0 1200 260" role="img" aria-label="NPC FailGuard - never-drop API key failover proxy">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0b1220"/>
+      <stop offset="1" stop-color="#131f3a"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#5aa2ff"/>
+      <stop offset="1" stop-color="#2dd4a8"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="1200" height="260" rx="14" fill="url(#bg)"/>
+  <rect x="0.5" y="0.5" width="1199" height="259" rx="14" fill="none" stroke="#2a3b5e" stroke-width="1"/>
+
+  <!-- title -->
+  <text x="72" y="118" font-family="ui-sans-serif, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif"
+        font-size="58" font-weight="800" fill="#f2f6ff" letter-spacing="1">NPC
+    <tspan fill="url(#accent)"> FailGuard</tspan>
+  </text>
+  <text x="74" y="162" font-family="ui-sans-serif, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif"
+        font-size="22" fill="#9fb2d8">Never-drop API-key failover proxy for Claude Code &amp; Anthropic-compatible APIs</text>
+  <text x="74" y="204" font-family="ui-monospace, 'Cascadia Code', Consolas, monospace"
+        font-size="16" fill="#6d81ab">401 / 402 / 429 / 5xx&#8201;&#8594;&#8201;rotate key&#8201;&#8594;&#8201;retry&#8201;&#8594;&#8201;200 &#10003;&#160;&#160;&#183;&#160;&#160;zero lost context</text>
+
+  <!-- key-state chips -->
+  <g font-family="ui-monospace, 'Cascadia Code', Consolas, monospace" font-size="15">
+    <rect x="905" y="62" width="200" height="34" rx="17" fill="#12281f" stroke="#2dd4a8" stroke-width="1"/>
+    <circle cx="927" cy="79" r="6" fill="#2dd4a8"/>
+    <text x="945" y="84" fill="#bdf0dd">key-1&#160;&#160;active</text>
+
+    <rect x="905" y="112" width="200" height="34" rx="17" fill="#2b2413" stroke="#e8b73a" stroke-width="1"/>
+    <circle cx="927" cy="129" r="6" fill="#e8b73a"/>
+    <text x="945" y="134" fill="#f3ddA0">key-2&#160;&#160;cooling</text>
+
+    <rect x="905" y="162" width="200" height="34" rx="17" fill="#2b1717" stroke="#e05d5d" stroke-width="1"/>
+    <circle cx="927" cy="179" r="6" fill="#e05d5d"/>
+    <text x="945" y="184" fill="#f0bcbc">key-3&#160;&#160;dead</text>
+  </g>
+
+  <text x="1128" y="236" text-anchor="end" font-family="ui-sans-serif, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif"
+        font-size="14" fill="#55688f">by NPC Automators</text>
+</svg>
