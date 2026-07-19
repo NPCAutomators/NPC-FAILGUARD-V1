@@ -20,6 +20,15 @@ jobs:
         # Windows PowerShell 5.1; echo. feeds the "Press Enter" prompt.
         run: cmd /c "set PSModulePath=&& echo. | powershell -NoProfile -ExecutionPolicy Bypass -File install.ps1 -NoClaude"
 
+      - name: Re-run installer (upgrade over existing install must not crash)
+        run: |
+          cmd /c "set PSModulePath=&& echo. | powershell -NoProfile -ExecutionPolicy Bypass -File install.ps1 -NoClaude"
+          if ($LASTEXITCODE -ne 0) { throw "reinstall failed" }
+          $run = Get-ItemProperty "HKCU:\Software\Microsoft\Windows\CurrentVersion\Run" -Name "NPC FailGuard" -ErrorAction SilentlyContinue
+          if (-not $run) { throw "autostart Run-key entry missing" }
+          Write-Host "autostart entry: $($run.'NPC FailGuard')"
+          # the daemon the installer just started gets killed between steps by the runner - expected
+
       - name: Start daemon + exercise proxy (one step - CI kills bg procs between steps)
         run: |
           $py = Join-Path $PWD "core\.venv\Scripts\python.exe"
