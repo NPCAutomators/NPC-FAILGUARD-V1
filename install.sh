@@ -86,7 +86,8 @@ if [ -d "$CORE_DIR/.venv" ] && ! venv_ok; then
 fi
 if [ ! -d "$CORE_DIR/.venv" ]; then
     echo "==> Creating venv in core/ (Python >=$MIN_PY, fetched by uv if needed)..."
-    uv venv --python ">=$MIN_PY" "$CORE_DIR/.venv" >/dev/null 2>&1
+    # do NOT hide errors - a failed CPython download must be visible
+    uv venv --python ">=$MIN_PY" "$CORE_DIR/.venv"
 fi
 echo "==> Installing dependencies..."
 uv pip install --quiet -r "$CORE_DIR/requirements.txt" --python "$CORE_DIR/.venv/bin/python"
@@ -122,14 +123,24 @@ StandardError=journal
 WantedBy=default.target
 UNIT
 
+mkdir -p "$CORE_DIR/logs"   # needed before the daemon first starts
+
 if systemctl --user list-units >/dev/null 2>&1; then
     systemctl --user daemon-reload
     systemctl --user enable npc-failguard.service >/dev/null 2>&1
-    echo "[✓] Systemd user service installed + enabled"
+    # START it too - enable alone leaves the proxy dead until next login,
+    # and Claude Code would then route into a dead port on fresh machines.
+    systemctl --user restart npc-failguard.service
+    echo "[✓] Systemd user service installed + started"
 else
-    echo "[!] No systemd user session (D-Bus unavailable)."
-    echo "    Unit file written; the daemon can also be started directly:"
-    echo "    bash \"$SCRIPT_DIR/scripts/service.sh\" start"
+    echo "[!] No systemd user session (D-Bus unavailable) - starting directly."
+    bash "$SCRIPT_DIR/scripts/service.sh" start
+fi
+if bash "$SCRIPT_DIR/scripts/service.sh" wait-ready >/dev/null 2>&1; then
+    echo "[✓] Proxy is up on 127.0.0.1:${NPC_FAILGUARD_PORT:-8787}"
+else
+    echo "[!] Proxy not answering yet - check later with:"
+    echo "    bash \"$SCRIPT_DIR/scripts/service.sh\" is-active"
 fi
 
 # ---- 5. Shell env vars (idempotent) ----
@@ -154,9 +165,6 @@ ENVBLOCK
 }
 add_env_block "$HOME/.bashrc"
 add_env_block "$HOME/.zshrc"
-
-# ---- 6. Log dir ----
-mkdir -p "$CORE_DIR/logs"
 
 # ---- 7. Claude Code auto-setup (detect / install / settings.json) ----
 if [ "$SKIP_CLAUDE" -ne 1 ] && [ -x "$SCRIPT_DIR/scripts/setup-claude-code.sh" ]; then

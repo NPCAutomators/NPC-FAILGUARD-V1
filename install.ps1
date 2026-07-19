@@ -5,6 +5,12 @@
 param([switch]$NoClaude)
 
 $ErrorActionPreference = "Stop"
+# Older Win10 PowerShell 5.1 may not offer TLS 1.2 by default; the uv and
+# Claude Code download endpoints require it.
+try {
+    [Net.ServicePointManager]::SecurityProtocol = `
+        [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12
+} catch {}
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $CoreDir   = Join-Path $ScriptDir "core"
 $TaskName  = "NPC FailGuard"

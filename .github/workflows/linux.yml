@@ -1,0 +1,92 @@
+name: Linux install test
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  linux-install:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      APP: /home/runner/.npc-failguard/app
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Bootstrap (fresh machine, exact curl path)
+        run: |
+          set -x
+          git archive --prefix=npc-failguard/ -o /tmp/app.tar.gz HEAD
+          NPC_FAILGUARD_TARBALL="file:///tmp/app.tar.gz" bash bootstrap.sh
+
+      - name: Proxy must be up after install (0 keys, fresh)
+        run: |
+          curl -sf --max-time 5 http://127.0.0.1:8787/_npc-failguard/status
+          echo ""
+          n=$(curl -sf http://127.0.0.1:8787/_npc-failguard/status | python3 -c 'import json,sys; print(len(json.load(sys.stdin)["keys"]))')
+          [ "$n" -eq 0 ] || { echo "expected 0 keys on fresh install, got $n"; exit 1; }
+
+      - name: Add key + hot reload + statusline
+        run: |
+          "$APP/core/.venv/bin/python" "$APP/core/manage.py" add-key sk-ci-dummy-0123456789abcdef
+          n=$(curl -sf http://127.0.0.1:8787/_npc-failguard/status | python3 -c 'import json,sys; print(len(json.load(sys.stdin)["keys"]))')
+          [ "$n" -ge 1 ] || { echo "key did not appear after hot reload"; exit 1; }
+          out=$(echo '{"model":{"display_name":"CI"}}' | bash "$APP/scripts/statusline.sh")
+          echo "statusline: $out"
+          [ -n "$out" ] || { echo "statusline printed nothing"; exit 1; }
+
+      - name: Claude Code config was written (settings.json + onboarding bypass)
+        run: |
+          python3 - <<'EOF'
+          import json, os
+          s = json.load(open(os.path.expanduser("~/.claude/settings.json")))
+          assert s["env"]["ANTHROPIC_BASE_URL"] == "http://127.0.0.1:8787", s["env"]
+          assert "statusLine" in s, "statusLine missing"
+          assert s["enabledPlugins"]["npc-failguard@npc-failguard-local"] is True
+          cj = json.load(open(os.path.expanduser("~/.claude.json")))
+          assert cj["hasCompletedOnboarding"] is True
+          print("settings.json + .claude.json OK")
+          EOF
+
+      - name: Re-bootstrap (upgrade path must preserve keys + restart proxy)
+        run: |
+          NPC_FAILGUARD_TARBALL="file:///tmp/app.tar.gz" bash bootstrap.sh
+          for i in $(seq 1 20); do
+            curl -sf --max-time 2 http://127.0.0.1:8787/_npc-failguard/status >/dev/null && break
+            sleep 1
+          done
+          n=$(curl -sf http://127.0.0.1:8787/_npc-failguard/status | python3 -c 'import json,sys; print(len(json.load(sys.stdin)["keys"]))')
+          [ "$n" -ge 1 ] || { echo "keys were lost during upgrade"; exit 1; }
+          echo "upgrade preserved $n key(s)"
+
+      - name: Run test suite
+        run: |
+          "$APP/core/.venv/bin/python" -m pip --version >/dev/null 2>&1 || true
+          uv pip install --quiet -r "$APP/core/requirements-dev.txt" --python "$APP/core/.venv/bin/python" \
+            || "$APP/core/.venv/bin/python" -m pip install -q -r "$APP/core/requirements-dev.txt"
+          cd "$APP" && ./core/.venv/bin/python -m pytest tests/ -q
+
+      - name: Uninstall cleanly
+        run: |
+          bash "$APP/uninstall.sh" --yes
+          if curl -sf --max-time 2 http://127.0.0.1:8787/_npc-failguard/status >/dev/null 2>&1; then
+            echo "proxy still answering after uninstall"; exit 1
+          fi
+          python3 - <<'EOF'
+          import json, os
+          p = os.path.expanduser("~/.claude/settings.json")
+          if os.path.exists(p):
+              env = json.load(open(p)).get("env", {})
+              assert "ANTHROPIC_BASE_URL" not in env, "env not reverted"
+          print("uninstall reverted settings OK")
+          EOF
+
+      - name: Diagnostics on failure
+        if: failure()
+        run: |
+          echo "--- proxy.log ---";  tail -50 "$APP/core/logs/proxy.log"  2>/dev/null || true
+          echo "--- daemon.out ---"; tail -50 "$APP/core/logs/daemon.out" 2>/dev/null || true
+          echo "--- systemd ---";    systemctl --user status npc-failguard.service 2>&1 || true
+          echo "--- journal ---";    journalctl --user -u npc-failguard.service -n 50 2>&1 || true
+          echo "--- procs ---";      pgrep -af main.py || true

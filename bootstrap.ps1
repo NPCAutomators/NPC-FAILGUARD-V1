@@ -5,6 +5,11 @@
 # If you publish under a different GitHub org/repo, change $GithubRepo below
 # (or set NPC_FAILGUARD_GITHUB_REPO) and the matching line in README.md.
 $ErrorActionPreference = "Stop"
+# Older Win10 PowerShell 5.1 may not offer TLS 1.2 by default; GitHub needs it
+try {
+    [Net.ServicePointManager]::SecurityProtocol = `
+        [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12
+} catch {}
 
 # --- identity (edit when the public GitHub repo changes) --------------------
 $GithubRepo   = if ($env:NPC_FAILGUARD_GITHUB_REPO) { $env:NPC_FAILGUARD_GITHUB_REPO }
@@ -45,8 +50,13 @@ try {
             $p = Join-Path $InstallDir "core\$f"
             if (Test-Path $p) { Copy-Item $p (Join-Path $Keep $f) -Force }
         }
-        # Stop the daemon so the venv isn't file-locked during removal
+        # Stop the daemon so the venv isn't file-locked during removal:
+        # legacy scheduled task AND the python process itself (Run-key installs)
         try { Stop-ScheduledTask -TaskName "NPC FailGuard" -ErrorAction SilentlyContinue } catch {}
+        Get-CimInstance Win32_Process -Filter "Name like 'python%'" -ErrorAction SilentlyContinue |
+            Where-Object { $_.CommandLine -like "*$InstallDir*main.py*" } |
+            ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
+        Start-Sleep -Milliseconds 500
         Remove-Item -Recurse -Force $InstallDir
     }
     New-Item -ItemType Directory -Force (Split-Path $InstallDir) | Out-Null

@@ -11,13 +11,20 @@ ROOT_DIR="$(dirname "$SCRIPT_DIR")"
 CORE_DIR="$ROOT_DIR/core"
 PORT="${NPC_FAILGUARD_PORT:-8787}"
 UNIT="npc-failguard.service"
-WIN_TASK="NPC FailGuard"
 
 is_windows() {
     case "$(uname -s 2>/dev/null)" in
         MINGW*|MSYS*|CYGWIN*) return 0 ;;
         *) return 1 ;;
     esac
+}
+
+win_service() {
+    # Delegate to service.ps1 (single source of truth for the Windows
+    # hidden-daemon start/stop; Run-key installs have no scheduled task).
+    local ps1="$SCRIPT_DIR/service.ps1"
+    if command -v cygpath >/dev/null 2>&1; then ps1="$(cygpath -w "$ps1")"; fi
+    powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$ps1" "$1"
 }
 
 have_systemd_bus() {
@@ -43,9 +50,7 @@ proxy_pid() {
 
 do_start() {
     if is_windows; then
-        schtasks //Run //TN "$WIN_TASK" >/dev/null 2>&1 \
-            || schtasks /Run /TN "$WIN_TASK" >/dev/null 2>&1 \
-            || { echo "cannot start task '$WIN_TASK' - run install.ps1 first"; return 1; }
+        win_service start
     elif have_systemd_bus; then
         systemctl --user start "$UNIT"
     else
@@ -61,11 +66,7 @@ do_start() {
 
 do_stop() {
     if is_windows; then
-        schtasks //End //TN "$WIN_TASK" >/dev/null 2>&1 \
-            || schtasks /End /TN "$WIN_TASK" >/dev/null 2>&1 || true
-        # schtasks /End doesn't always kill children; be sure
-        local pid; pid="$(proxy_pid)"
-        [ -n "$pid" ] && kill "$pid" 2>/dev/null || true
+        win_service stop
     elif have_systemd_bus; then
         systemctl --user stop "$UNIT"
     else

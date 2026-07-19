@@ -64,10 +64,14 @@ echo ""
 # ---- 1. Service (systemd on Linux; Task Scheduler task if on Windows) ----
 case "$(uname -s 2>/dev/null)" in
     MINGW*|MSYS*|CYGWIN*)
+        # Run-key autostart (current installs) + legacy scheduled task
+        reg.exe delete "HKCU\Software\Microsoft\Windows\CurrentVersion\Run" \
+            /v "NPC FailGuard" /f >/dev/null 2>&1 || true
         schtasks //End //TN "NPC FailGuard" >/dev/null 2>&1 || true
         schtasks //Delete //TN "NPC FailGuard" //F >/dev/null 2>&1 \
             || schtasks /Delete /TN "NPC FailGuard" /F >/dev/null 2>&1 || true
-        echo "[✓] Removed scheduled task (if present)"
+        pkill -f "core/main.py" 2>/dev/null || true
+        echo "[✓] Removed autostart (Run key / scheduled task)"
         ;;
     *)
         if systemctl --user list-unit-files npc-failguard.service >/dev/null 2>&1; then
@@ -80,6 +84,8 @@ case "$(uname -s 2>/dev/null)" in
         else
             echo "[✓] No systemd service to remove"
         fi
+        # no-systemd fallback installs run via nohup - stop that too
+        pkill -f "$CORE_DIR/main.py" 2>/dev/null || true
         ;;
 esac
 

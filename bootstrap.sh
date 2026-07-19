@@ -32,17 +32,22 @@ echo "==> Downloading..."
 curl -fsSL "$TARBALL_URL" -o "$TMP/app.tar.gz"
 mkdir -p "$TMP/x"
 tar -xzf "$TMP/app.tar.gz" -C "$TMP/x"
-SRC="$(find "$TMP/x" -maxdepth 2 -name install.sh -printf '%h\n' | head -1)"
-[ -n "$SRC" ] || {
+# portable (no GNU find -printf): locate install.sh, then take its dir
+INSTALL_SH="$(find "$TMP/x" -maxdepth 2 -name install.sh 2>/dev/null | head -1)"
+[ -n "$INSTALL_SH" ] || {
     echo "[!] install.sh not found inside the archive (wrong tarball?)."
     exit 1
 }
+SRC="$(dirname "$INSTALL_SH")"
 
 if [ -d "$INSTALL_DIR" ]; then
     echo "==> Existing install found — upgrading (keys/state preserved)"
     for f in $KEEP_FILES; do
         [ -f "$INSTALL_DIR/core/$f" ] && cp -p "$INSTALL_DIR/core/$f" "$TMP/x/" || true
     done
+    # stop the old daemon so the reinstall starts the NEW code (systemd
+    # restarts it itself; this covers the no-systemd/nohup fallback)
+    pkill -f "$INSTALL_DIR/core/main.py" 2>/dev/null || true
     rm -rf "$INSTALL_DIR"
 fi
 mkdir -p "$(dirname "$INSTALL_DIR")"
