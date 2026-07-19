@@ -1,4 +1,4 @@
-# NPC FailGuard - Windows service control (Task Scheduler based).
+# NPC FailGuard - Windows service control (hidden daemon via run-hidden.vbs).
 # Usage: .\service.ps1 start|stop|restart|is-active|wait-ready
 $ErrorActionPreference = "Stop"
 
@@ -14,16 +14,19 @@ function Get-ProxyProcess {
 }
 
 function Start-Proxy {
-    try {
-        Start-ScheduledTask -TaskName $TaskName
-        Write-Host "started task '$TaskName'"
-    } catch {
-        Write-Host "cannot start task '$TaskName' - run install.ps1 first ($_)"
+    if (Get-ProxyProcess) { Write-Host "already running"; return }
+    $Vbs = Join-Path $ScriptDir "run-hidden.vbs"
+    if (Test-Path $Vbs) {
+        Start-Process wscript.exe -ArgumentList "//B //Nologo `"$Vbs`""
+        Write-Host "started (hidden)"
+    } else {
+        Write-Host "run-hidden.vbs missing - run install.ps1 first"
         exit 1
     }
 }
 
 function Stop-Proxy {
+    # legacy installs used a scheduled task - stop it too if present
     try { Stop-ScheduledTask -TaskName $TaskName -ErrorAction SilentlyContinue } catch {}
     Get-ProxyProcess | ForEach-Object {
         Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue

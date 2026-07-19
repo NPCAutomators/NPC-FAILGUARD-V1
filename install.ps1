@@ -1,6 +1,6 @@
 # NPC FailGuard - Windows installer.
 # Mirrors requirements.sh + install.sh: uv, venv (Python >=3.10), deps,
-# Task Scheduler at-logon task, and Claude Code auto-setup.
+# hidden autostart at logon (HKCU Run key), and Claude Code auto-setup.
 # Usage:  powershell -ExecutionPolicy Bypass -File install.ps1 [-NoClaude]
 param([switch]$NoClaude)
 
@@ -62,34 +62,42 @@ try {
     uv pip install --quiet -r (Join-Path $CoreDir "requirements.txt") --python $VenvPy
     Write-Host "[OK] Dependencies installed"
 
-    # ---- 3. Task Scheduler at-logon task ----
-    # Launch via wscript + run-hidden.vbs: fully hidden, NO console window
-    # (a visible window invites an accidental close that kills the proxy).
-    $HiddenVbs = Join-Path $ScriptDir "scripts\run-hidden.vbs"
-    $Action  = New-ScheduledTaskAction -Execute "wscript.exe" `
-        -Argument "//B //Nologo `"$HiddenVbs`"" -WorkingDirectory $CoreDir
-    $Trigger = New-ScheduledTaskTrigger -AtLogOn -User $env:USERNAME
-    $Settings = New-ScheduledTaskSettingsSet `
-        -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries `
-        -RestartCount 3 -RestartInterval (New-TimeSpan -Minutes 1) `
-        -ExecutionTimeLimit (New-TimeSpan -Days 3650)
-    # Stop any previous daemon (e.g. the old visible-console instance) so the
-    # fresh hidden one can bind the port, then overwrite the task (-Force -
-    # plain Unregister can silently fail and leave the old task behind).
+    # ---- 3. Autostart at logon (hidden; no admin rights needed) ----
+    # HKCU Run key + wscript/run-hidden.vbs: fully hidden (no console window
+    # to accidentally close) and always writable by the current user.
+    # Older versions used a Task Scheduler task; it can be admin-locked
+    # ("Access is denied"), so remove it best-effort and escalate via UAC
+    # only if it is still there.
     try { Stop-ScheduledTask -TaskName $TaskName -ErrorAction SilentlyContinue } catch {}
     Get-CimInstance Win32_Process -Filter "Name like 'python%'" -ErrorAction SilentlyContinue |
         Where-Object { $_.CommandLine -like "*$CoreDir\main.py*" } |
         ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
     Unregister-ScheduledTask -TaskName $TaskName -Confirm:$false -ErrorAction SilentlyContinue
-    Register-ScheduledTask -TaskName $TaskName -Action $Action -Trigger $Trigger `
-        -Settings $Settings -Description "NPC FailGuard - API key rotating proxy" `
-        -Force | Out-Null
-    Write-Host "[OK] Scheduled task '$TaskName' registered (starts at logon)"
+    if (Get-ScheduledTask -TaskName $TaskName -ErrorAction SilentlyContinue) {
+        # try/catch: with EAP=Stop, PS 5.1 turns native stderr under 2> into
+        # a terminating error (e.g. schtasks "Access is denied")
+        try { schtasks /Delete /TN "$TaskName" /F 2>$null | Out-Null } catch {}
+    }
+    if (Get-ScheduledTask -TaskName $TaskName -ErrorAction SilentlyContinue) {
+        Write-Host "[!] Old '$TaskName' task is admin-locked; asking for admin (UAC) to remove it..."
+        try {
+            Start-Process powershell -Verb RunAs -Wait -ArgumentList `
+                "-NoProfile -Command schtasks /Delete /TN \`"$TaskName\`" /F"
+        } catch {
+            Write-Host "[!] Elevation declined - delete the '$TaskName' task manually in Task Scheduler."
+        }
+    }
+
+    $HiddenVbs = Join-Path $ScriptDir "scripts\run-hidden.vbs"
+    $RunKey    = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Run"
+    Set-ItemProperty -Path $RunKey -Name $TaskName `
+        -Value "wscript.exe //B //Nologo `"$HiddenVbs`""
+    Write-Host "[OK] Autostart registered (starts hidden at logon)"
 
     # ---- 4. Log dir + start now ----
     New-Item -ItemType Directory -Force (Join-Path $CoreDir "logs") | Out-Null
-    Start-ScheduledTask -TaskName $TaskName
-    Write-Host "[OK] Daemon started"
+    Start-Process wscript.exe -ArgumentList "//B //Nologo `"$HiddenVbs`""
+    Write-Host "[OK] Daemon started (hidden)"
 
     # ---- 5. Claude Code auto-setup ----
     if (-not $NoClaude) {

@@ -39,7 +39,12 @@ try {
     Write-Host "==> Uninstalling..."
     Write-Host ""
 
-    # ---- 1. Scheduled task + running daemon ----
+    # ---- 1. Autostart (Run key + legacy scheduled task) + running daemon ----
+    $RunKey = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Run"
+    if (Get-ItemProperty -Path $RunKey -Name $TaskName -ErrorAction SilentlyContinue) {
+        Remove-ItemProperty -Path $RunKey -Name $TaskName -ErrorAction SilentlyContinue
+        Write-Host "[OK] Removed autostart entry"
+    }
     try { Stop-ScheduledTask -TaskName $TaskName -ErrorAction SilentlyContinue } catch {}
     try {
         Unregister-ScheduledTask -TaskName $TaskName -Confirm:$false -ErrorAction Stop
