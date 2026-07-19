@@ -90,6 +90,7 @@ try {
 
     $HiddenVbs = Join-Path $ScriptDir "scripts\run-hidden.vbs"
     $RunKey    = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Run"
+    if (-not (Test-Path $RunKey)) { New-Item -Path $RunKey -Force | Out-Null }
     Set-ItemProperty -Path $RunKey -Name $TaskName `
         -Value "wscript.exe //B //Nologo `"$HiddenVbs`""
     Write-Host "[OK] Autostart registered (starts hidden at logon)"
