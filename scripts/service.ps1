@@ -13,16 +13,32 @@ function Get-ProxyProcess {
         Where-Object { $_.CommandLine -like "*$CoreDir\main.py*" }
 }
 
+function Start-ProxyDirect {
+    # Visible-process fallback: works in services/CI where wscript cannot
+    # spawn (no interactive desktop). Output goes to core\logs\daemon.out.
+    $LogDir = Join-Path $CoreDir "logs"
+    if (-not (Test-Path $LogDir)) { New-Item -ItemType Directory -Path $LogDir | Out-Null }
+    $PyExe = Join-Path $CoreDir ".venv\Scripts\python.exe"
+    Start-Process -FilePath $PyExe -ArgumentList "`"$(Join-Path $CoreDir 'main.py')`"" `
+        -WorkingDirectory $CoreDir -WindowStyle Hidden `
+        -RedirectStandardOutput (Join-Path $LogDir "daemon.out") `
+        -RedirectStandardError  (Join-Path $LogDir "daemon.err")
+    Write-Host "started (direct)"
+}
+
 function Start-Proxy {
     if (Get-ProxyProcess) { Write-Host "already running"; return }
     $Vbs = Join-Path $ScriptDir "run-hidden.vbs"
-    if (Test-Path $Vbs) {
-        Start-Process wscript.exe -ArgumentList "//B //Nologo `"$Vbs`""
-        Write-Host "started (hidden)"
-    } else {
-        Write-Host "run-hidden.vbs missing - run install.ps1 first"
-        exit 1
+    if (-not (Test-Path $Vbs)) { Start-ProxyDirect; return }
+    Start-Process wscript.exe -ArgumentList "//B //Nologo `"$Vbs`""
+    # wscript can silently fail (session 0, CI runners, group policy):
+    # verify the python process actually appeared, else start directly.
+    $alive = $false
+    for ($i = 0; $i -lt 10; $i++) {
+        Start-Sleep -Milliseconds 500
+        if (Get-ProxyProcess) { $alive = $true; break }
     }
+    if ($alive) { Write-Host "started (hidden)" } else { Start-ProxyDirect }
 }
 
 function Stop-Proxy {
@@ -43,7 +59,7 @@ function Test-Active {
 }
 
 function Wait-Ready {
-    for ($i = 0; $i -lt 20; $i++) {
+    for ($i = 0; $i -lt 40; $i++) {
         try {
             Invoke-RestMethod -Uri "http://127.0.0.1:$Port/_npc-failguard/status" -TimeoutSec 2 | Out-Null
             Write-Host "ready"
@@ -51,6 +67,13 @@ function Wait-Ready {
         } catch { Start-Sleep -Milliseconds 500 }
     }
     Write-Host "not-ready"
+    foreach ($f in @("daemon.out", "daemon.err")) {
+        $p = Join-Path $CoreDir "logs\$f"
+        if ((Test-Path $p) -and (Get-Item $p).Length -gt 0) {
+            Write-Host "--- $f (tail) ---"
+            Get-Content $p -Tail 15 | ForEach-Object { Write-Host "  $_" }
+        }
+    }
     exit 1
 }
 

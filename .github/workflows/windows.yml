@@ -54,8 +54,8 @@ jobs:
 
       - name: FULL matrix - every command x every condition (ends with uninstall)
         # One step: the runner kills background processes between steps, so the
-        # matrix starts the daemon itself (real production path: service.ps1 ->
-        # run-hidden.vbs -> hidden pythonw) and tears everything down in Phase H.
+        # matrix starts the daemon itself (service.ps1: hidden wscript path with
+        # automatic direct-start fallback for CI) and tears down in Phase H.
         run: |
           & pwsh -NoProfile -File tests\e2e\matrix.ps1
           if ($LASTEXITCODE -ne 0) { throw "matrix failed ($LASTEXITCODE checks)" }
@@ -68,6 +68,9 @@ jobs:
         run: |
           Write-Host "--- proxy.log ---"
           Get-Content core\logs\proxy.log -Tail 80 -ErrorAction SilentlyContinue
+          Write-Host "--- daemon.out / daemon.err (service.ps1 start) ---"
+          Get-Content core\logs\daemon.out -Tail 40 -ErrorAction SilentlyContinue
+          Get-Content core\logs\daemon.err -Tail 40 -ErrorAction SilentlyContinue
           Write-Host "--- daemon stderr/stdout (port-busy phase) ---"
           Get-Content "$env:TEMP\fg-daemon.err" -ErrorAction SilentlyContinue
           Get-Content "$env:TEMP\fg-daemon.out" -ErrorAction SilentlyContinue

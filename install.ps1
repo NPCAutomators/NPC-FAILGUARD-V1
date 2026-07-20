@@ -102,9 +102,12 @@ try {
     Write-Host "[OK] Autostart registered (starts hidden at logon)"
 
     # ---- 4. Log dir + start now ----
+    # service.ps1 tries the hidden wscript path first, then falls back to a
+    # direct Start-Process (needed on CI runners / non-interactive sessions
+    # where wscript cannot spawn processes).
     New-Item -ItemType Directory -Force (Join-Path $CoreDir "logs") | Out-Null
-    Start-Process wscript.exe -ArgumentList "//B //Nologo `"$HiddenVbs`""
-    Write-Host "[OK] Daemon started (hidden)"
+    & (Join-Path $ScriptDir "scripts\service.ps1") start
+    Write-Host "[OK] Daemon started"
 
     # ---- 5. Claude Code auto-setup ----
     if (-not $NoClaude) {
