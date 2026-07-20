@@ -9,16 +9,26 @@
 [![Windows](https://github.com/NPCAutomators/NPC-FAILGUARD-V1/actions/workflows/windows.yml/badge.svg)](https://github.com/NPCAutomators/NPC-FAILGUARD-V1/actions/workflows/windows.yml)
 [![Linux](https://github.com/NPCAutomators/NPC-FAILGUARD-V1/actions/workflows/linux.yml/badge.svg)](https://github.com/NPCAutomators/NPC-FAILGUARD-V1/actions/workflows/linux.yml)
 ![Python](https://img.shields.io/badge/python-3.10%2B-3776AB?logo=python&logoColor=white)
+![FastAPI](https://img.shields.io/badge/FastAPI-uvicorn-009688?logo=fastapi&logoColor=white)
 ![Platforms](https://img.shields.io/badge/platform-Linux%20%7C%20Windows-444)
+![Tests](https://img.shields.io/badge/E2E%20matrix-287%20checks%20green-2ea44f)
 ![License](https://img.shields.io/badge/license-proprietary-8A2BE2)
 
-*One key dies → the next takes over, mid-request. No restart, no lost context.*
+*One key dies → the next takes over, mid-request. No restart, no lost context, no interruption.*
+
+[Quick start](#-quick-start) •
+[Architecture](#-architecture--the-full-process) •
+[Why I built this](#-why-i-built-this) •
+[What you get](#-what-it-gives-you) •
+[For students](#-why-students-should-use-it) •
+[Install](#-install-on-linux) •
+[Usage](#-how-to-use)
 
 </div>
 
 ---
 
-## Quick start
+## ⚡ Quick start
 
 **Linux**
 ```bash
@@ -37,77 +47,203 @@ Then open a **new** terminal, run `claude`, and add your provider + keys:
 Every argument is optional — run `/npc-failguard:setup` with nothing to see setup
 state and next steps, give only the URL now and add keys later (or the other way
 round). Verify anything anytime with `/npc-failguard:status` — free, zero credit.
+
 That's it — Claude Code now routes through the proxy, keys rotate automatically, and
 the status bar shows live spend.
 
 ---
 
-## What it does
+## 🎯 What it does — in one paragraph
 
-A local proxy that transparently rotates multiple API keys for any
-Anthropic-compatible provider. When one key returns `401` / `402` / `429` / `5xx`,
-the proxy silently retries the same request with the next key. Claude Code (or any
-Anthropic-compatible client) points at `http://127.0.0.1:8787` and never notices the
-swap; it just sees a slightly delayed `200`.
-
-- 🔁 **Automatic failover** — dead / throttled / exhausted keys are skipped and self-revive
-- 🧠 **Zero-touch install** — auto-installs Claude Code, skips onboarding, registers the plugin
-- 💸 **Live cost tracking** — passive token→USD counter + budget in the Claude Code status bar
-- 🖥️ **Cross-platform** — Linux (systemd) and Windows (hidden background daemon), tested in CI on both, on every push
-- 🔒 **Local-only** — binds to `127.0.0.1`; your keys never leave the machine
+NPC FailGuard is a **local reverse proxy** that sits between Claude Code (or any
+Anthropic-compatible client) and your API provider, and transparently manages a
+**pool of API keys**. When the current key fails — invalid (`401`), out of credit
+(`402`), rate-limited (`429`), or the provider itself hiccups (`5xx`) — the proxy
+classifies the failure, marks the key accordingly, and **silently replays the exact
+same request with the next healthy key**. The client never sees the failure; it just
+receives a slightly delayed `200`. Your coding session, your context window, and
+your train of thought all survive intact.
 
 **© 2026 NPC Automators. Proprietary — personal use only. See [LICENSE](LICENSE).**
 Bring your own API keys. You are responsible for complying with your provider's terms.
 
 ---
 
-<details>
-<summary><b>Table of contents</b></summary>
+## 🏗 Architecture — the full process
 
-1. [How it works](#how-it-works)
-2. [Requirements](#requirements)
-3. [Install on Linux](#install-on-linux)
-4. [Install on Windows](#install-on-windows)
-5. [Install as a Claude Code plugin](#install-as-a-claude-code-plugin)
-6. [How to use](#how-to-use)
-7. [Credit / cost tracking](#credit--cost-tracking)
-8. [Switching providers](#switching-providers)
-9. [Troubleshooting](#troubleshooting)
-10. [Uninstall](#uninstall)
-11. [Files](#files)
+Everything runs on your machine. The proxy binds to `127.0.0.1:8787` only — no key,
+request, or statistic ever leaves your computer except the API call itself.
+
+```mermaid
+flowchart TB
+    subgraph CLIENT["🧑‍💻 Your machine — client side"]
+        CC["Claude Code<br/><sub>settings.json → ANTHROPIC_BASE_URL = http://127.0.0.1:8787</sub>"]
+        SL["Status bar<br/><sub>NPC $1.69 spent | $48.31 left | keys 72/78</sub>"]
+    end
+
+    subgraph FG["🛡 NPC FailGuard daemon (localhost only)"]
+        RT["Router<br/><sub>passthrough for every method & path</sub>"]
+        CL["Failure classifier<br/><sub>401→dead · 402→exhausted · 429/5xx→cooldown · 400→client error</sub>"]
+        KP["Key pool<br/><sub>sticky current key + state machine per key</sub>"]
+        UT["Usage tracker<br/><sub>tokens → USD, passive, zero extra requests</sub>"]
+        ST[("state.json / stats.json<br/><sub>survives restarts</sub>")]
+    end
+
+    subgraph UP["☁️ Provider"]
+        API["Anthropic-compatible API<br/><sub>any base URL</sub>"]
+    end
+
+    CC -->|"HTTP request"| RT
+    RT -->|"inject key #N"| API
+    API -.->|"401 / 402 / 429 / 5xx"| CL
+    CL -->|"mark key, pick next"| KP
+    KP -->|"retry same request, key #N+1"| API
+    API ==>|"200 OK ✅"| UT
+    UT ==>|"response untouched"| CC
+    UT --- ST
+    KP --- ST
+    ST --> SL
+```
+
+And the moment-by-moment story of one failover — what happens in the ~2 seconds
+where other setups would crash your session:
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant C as Claude Code
+    participant P as FailGuard proxy
+    participant A as Provider API
+
+    C->>P: POST /v1/messages
+    P->>A: same request + key-7
+    A-->>P: 429 Too Many Requests
+    Note over P: key-7 → rate_limited (auto-revives ~60s)
+    P->>A: same request + key-8
+    A-->>P: 402 Payment Required
+    Note over P: key-8 → exhausted (auto-revives ~5h)
+    P->>A: same request + key-9
+    A-->>P: 200 OK (stream)
+    P-->>C: 200 OK — client never saw a failure
+    Note over C: session, context & flow intact
+```
+
+The daemon runs in the background — via **systemd** (user service, no root) on Linux,
+via a **hidden autostart entry** (per-user Run key, no admin rights, no console
+window) on Windows — and survives logout/reboot.
+
+### The key state machine
+
+Each key lives in exactly one state. Every transition is automatic — **no state ever
+needs a manual reset to recover**:
+
+| State | Trigger | Meaning | Auto-recovers |
+|-------|---------|---------|---------------|
+| 🟢 `active` | — | usable now | — |
+| 🟡 `rate_limited` | `429`, transient `5xx`, provider "busy" | throttled, not broken | ~30–60 s |
+| 🟠 `exhausted` | `402` | credit/limit hit | ~5 h |
+| 🔴 `dead` | `401`/`403` "invalid token" | genuinely bad key | safety retry after 6 h |
+
+Two safety properties worth noting:
+
+- **Bounded rotation** — one request rotates through at most 10 keys before returning
+  a clear `503`, so a single malformed request can never burn the whole pool.
+- **Correct blame** — a `400` (your request was malformed) is passed straight back
+  and **no key is punished**; a `401` whose body says "busy" or "overloaded" is
+  treated as throttling, not death. Misclassification is what kills key pools in
+  naive round-robin scripts; the classifier here was built from real provider
+  behavior and is pinned down by the test matrix.
+
+---
+
+## 💡 Why I built this
+
+Aggregated / discounted API providers are how many of us can afford to use frontier
+models at all — but they come with a brutal failure mode: **keys die mid-session**.
+A key runs out of credit at 2 a.m., the provider throttles you during a burst, or a
+token silently gets revoked — and Claude Code greets you with `API Error` in the
+middle of a refactor. You lose the request, sometimes the context, always the flow.
+
+The obvious workarounds all fail the same test:
+
+- *Manually swapping keys* means editing settings and restarting — your session and
+  its carefully built context are gone.
+- *Shell scripts that round-robin keys* don't understand **why** a request failed —
+  they retry `400`s forever, kill healthy keys over one throttle, and have no memory
+  across restarts.
+- *Paying for one big key* defeats the entire point of using affordable pools.
+
+So I built the missing piece properly: a small, transparent, well-tested daemon that
+treats key failure as a **normal, recoverable event** instead of an emergency. It
+took real engineering to get right — failure classification tuned against real
+provider responses, SSE streaming passthrough, sticky key selection so prompt caches
+stay warm, hot-reload so adding a key never drops your live connection, and state
+that survives reboots. All of it is verified by a **287-check end-to-end matrix**
+(143 Linux + 144 Windows) that runs a *real installer → real daemon → real
+requests → real uninstall* on every push, against a mock provider so testing costs
+zero credit.
+
+---
+
+## 🎁 What it gives you
+
+| | Feature | What it means for you |
+|--|---------|----------------------|
+| 🔁 | **Automatic failover** | Dead / throttled / exhausted keys are skipped in-flight and self-revive. You stop thinking about keys entirely. |
+| 🧠 | **Zero-touch install** | One command installs the proxy, auto-installs Claude Code if missing, skips onboarding, registers the plugin, wires `settings.json`. |
+| 💸 | **Live cost tracking** | Passive token→USD counter (reads the `usage` block already in each response — zero extra requests) + budget countdown in the Claude Code status bar. |
+| 🧰 | **In-session management** | 16 slash commands — add/remove keys, switch providers, check status — all **without leaving Claude Code**, all hot-reloaded, almost all zero-credit. |
+| 🖥️ | **Cross-platform** | Linux (systemd user service) and Windows 10/11 (hidden daemon, no admin rights). Same behavior, proven by the same CI matrix on both. |
+| 🔒 | **Local-only by design** | Binds to `127.0.0.1`. Keys live in one `chmod 600` file on your disk. Logs and status displays always mask keys to their last 6 characters. |
+| 🩺 | **Self-healing + honest errors** | Every failure state auto-recovers, and when nothing can be done you get a *plain-English* `503` ("all keys cooling down — try in ~60s"), never a stack trace. |
+
+---
+
+## 🎓 Why students should use it
+
+Because students are exactly the users this problem hurts most:
+
+1. **You run on free tiers and cheap pools.** Small-credit keys exhaust *constantly*.
+   FailGuard turns ten fragile $5 keys into one key that effectively never dies —
+   the pool's total credit becomes one smooth resource.
+2. **Your study sessions are long; your keys are not.** A key dying 40 minutes into
+   debugging an assignment used to mean lost context and a restart. Now it means a
+   log line you'll read later — the answer still arrives.
+3. **You need to know exactly what you're spending.** The status bar shows live
+   spend against the budget *you* set (`/npc-failguard:set-budget 10`), computed
+   from exact token counts. No surprise empty balance the night before a deadline.
+4. **It's a working systems-engineering case study.** Reverse proxying, streaming
+   passthrough, failure taxonomy, state machines, hot-reload, systemd units, hidden
+   Windows services, CI matrices across two OSes — the codebase is small enough to
+   read in an afternoon (`core/` is ~5 plain-Python files) and real enough to learn
+   from. Show *your* professor how failover works — with a live demo.
+5. **Zero-credit operations.** Setup, status, key management, log inspection — every
+   routine command is engineered to cost **nothing**. The only calls that touch the
+   provider are your actual work and the optional `/npc-failguard:health` probe.
+
+---
+
+<details>
+<summary><b>📚 Table of contents</b></summary>
+
+1. [Requirements](#-requirements)
+2. [Install on Linux](#-install-on-linux)
+3. [Install on Windows](#-install-on-windows)
+4. [Install as a Claude Code plugin](#-install-as-a-claude-code-plugin)
+5. [How to use](#-how-to-use)
+6. [Credit / cost tracking](#-credit--cost-tracking)
+7. [Switching providers](#-switching-providers)
+8. [Testing & quality](#-testing--quality)
+9. [Troubleshooting](#-troubleshooting)
+10. [Uninstall](#-uninstall)
+11. [Repository layout](#-repository-layout)
+12. [Limitations](#-limitations)
 
 </details>
 
 ---
 
-## How it works
-
-```mermaid
-flowchart LR
-    CC["Claude Code<br/><sub>ANTHROPIC_BASE_URL = 127.0.0.1:8787</sub>"] --> P["NPC FailGuard<br/>proxy"]
-    P -- "request with key #1" --> API["Provider API"]
-    API -. "401 / 402 / 429 / 5xx" .-> P
-    P -- "same request, key #2 → 200 ✅" --> API
-```
-
-The daemon runs in the background — via **systemd** (user service, no root) on Linux,
-via a **hidden autostart entry** (per-user Run key, no admin rights, no console
-window) on Windows — and survives logout/reboot. Each key has a state:
-
-| State | Meaning | Recovers |
-|-------|---------|----------|
-| `active` | usable now | — |
-| `rate_limited` | 429, transient 5xx, or a provider "busy" throttle | auto, ~30–60s |
-| `exhausted` | 402 credit/limit hit | auto, ~5h |
-| `dead` | genuinely invalid key ("invalid token") | auto safety-retry after 6h |
-
-The proxy **self-heals** — no state ever needs a manual reset to recover. Revivals are
-logged, and one request rotates through at most 10 keys before giving up, so a single
-bad request can never burn the whole pool.
-
----
-
-## Requirements
+## 📋 Requirements
 
 - **Linux** with systemd (Ubuntu / Debian / Zorin / Mint / Fedora / Arch / openSUSE),
   **or Windows 10/11** (PowerShell)
@@ -120,7 +256,7 @@ On Linux, `requirements.sh` installs the system packages for you (asks for `sudo
 
 ---
 
-## Install on Linux
+## 🐧 Install on Linux
 
 ### One-command install (recommended)
 
@@ -134,6 +270,9 @@ Then open a **new** terminal, run `claude`, and:
 ```
 /npc-failguard:setup <base-url> <key1 key2 ... or /path/to/keys.txt>
 ```
+
+Re-running the same command later **upgrades in place** — keys, state, and budget
+are preserved automatically.
 
 (Forked or renamed the repo? Set `NPC_FAILGUARD_GITHUB_REPO=<org>/<repo>` before
 running, or edit `GITHUB_REPO=` at the top of `bootstrap.sh`.)
@@ -149,7 +288,7 @@ NPC_FAILGUARD_TARBALL=file:///path/to/npc-failguard.tar.gz bash bootstrap.sh
 Three commands, in order, from inside this folder. Every installer shows any error it
 hits and ends with **"Press any key to close"** — the terminal never slams shut on you.
 
-### Step 0 — system requirements (first time on a machine only)
+**Step 0 — system requirements** (first time on a machine only)
 ```bash
 ./requirements.sh
 ```
@@ -157,7 +296,7 @@ Installs `python3`, `pip`, `curl`, `ca-certificates`, `systemd`; enables user
 "lingering" so the daemon keeps running after logout. Needs `sudo` (asks once).
 At the end it offers to run `install.sh` for you.
 
-### Step 1 — install NPC FailGuard (no sudo)
+**Step 1 — install NPC FailGuard** (no sudo)
 ```bash
 ./install.sh
 ```
@@ -174,7 +313,7 @@ configures `~/.claude/settings.json` to route Claude Code through the proxy:
 also added as a belt-and-suspenders extra. Skip the Claude Code step with
 `./install.sh --no-claude`.)
 
-### Step 2 — add your keys + provider
+**Step 2 — add your keys + provider**
 ```bash
 ./api-setup.sh                                    # interactive
 ./api-setup.sh --keys-file keys.txt --base-url https://api.example.com --yes   # non-interactive
@@ -186,7 +325,7 @@ sends one tiny real request, so it uses a small amount of provider credit).
 
 ---
 
-## Install on Windows
+## 🪟 Install on Windows
 
 ### One-command install (recommended)
 
@@ -207,7 +346,7 @@ Then open a **new** terminal, run `claude`, and:
 
 From PowerShell, inside this folder:
 
-### Step 1 — install
+**Step 1 — install**
 ```powershell
 powershell -ExecutionPolicy Bypass -File install.ps1
 ```
@@ -219,7 +358,7 @@ winget fallback), and configures `%USERPROFILE%\.claude\settings.json` the same 
 Linux — proxy routing, the status-bar credit indicator, plugin registration, and
 onboarding skip. Skip the Claude Code step with `-NoClaude`.
 
-### Step 2 — add your keys + provider
+**Step 2 — add your keys + provider**
 ```powershell
 powershell -ExecutionPolicy Bypass -File api-setup.ps1                                          # interactive
 powershell -ExecutionPolicy Bypass -File api-setup.ps1 -KeysFile keys.txt -BaseUrl https://api.example.com -Yes
@@ -230,7 +369,7 @@ close. Logs live in `core\logs\proxy.log` (there is no journalctl on Windows).
 
 ---
 
-## Install as a Claude Code plugin
+## 🧩 Install as a Claude Code plugin
 
 The plugin adds slash commands + an operator skill so you can manage the proxy from
 inside Claude Code. The daemon must already be installed (steps above).
@@ -250,7 +389,7 @@ At the start of every session the plugin prints a one-line key-status summary.
 
 ---
 
-## How to use
+## 🕹 How to use
 
 ### Everyday use
 Just run `claude` — `settings.json` routes it through the proxy automatically. Key
@@ -328,7 +467,7 @@ your-api-key-ghi789...
 
 ---
 
-## Credit / cost tracking
+## 💰 Credit / cost tracking
 
 The proxy counts every token that passes through it — **passively**. It reads the
 `usage` block the provider already includes in each response (both buffered JSON and
@@ -360,7 +499,7 @@ streaming SSE), so tracking costs **zero extra credit and zero extra requests**.
 
 ---
 
-## Switching providers
+## 🔄 Switching providers
 
 Inside Claude Code:
 ```
@@ -374,7 +513,25 @@ Or from the terminal (old keys and state are wiped):
 
 ---
 
-## Troubleshooting
+## ✅ Testing & quality
+
+This project is tested the way infrastructure should be — **end to end, on real
+operating systems, on every push**:
+
+| Layer | What runs | Where |
+|-------|-----------|-------|
+| Unit / integration | pytest suite over the classifier, key store, manager CLI, usage tracker (mocked upstream via respx) | both CI jobs |
+| **Linux E2E matrix** | **143 checks**: fresh `curl` bootstrap → real daemon → every command × every condition — empty install, keys-without-provider, full rotation matrix (`401/402/403/429/500/529`, SSE, 10× parallel), corrupt config files, daemon down, port squatted, restart, uninstall | Docker (ubuntu:24.04) + GitHub Actions |
+| **Windows E2E matrix** | **144 checks**: the same A-to-Z matrix ported to PowerShell — real `install.ps1`, hidden-daemon start, the full rotation matrix, uninstall leaves no trace (no process, no port, no Run key, clean `settings.json`) | GitHub Actions `windows-latest` |
+
+All matrix tests run against a local **mock provider**, so the full suite costs
+**zero real API credit**. The failure classifier's every branch — including subtle
+ones like "`401` whose body says *busy* is throttling, not death" — is pinned by a
+named check.
+
+---
+
+## 🔧 Troubleshooting
 
 | Symptom | Fix |
 |---------|-----|
@@ -390,7 +547,7 @@ Run the built-in health probe any time:
 
 ---
 
-## Uninstall
+## 🗑 Uninstall
 
 Linux:
 ```bash
@@ -417,7 +574,7 @@ claude plugin marketplace remove npc-failguard-local
 
 ---
 
-## Files
+## 📁 Repository layout
 
 ### Root — what you interact with
 | File | Purpose |
@@ -425,7 +582,7 @@ claude plugin marketplace remove npc-failguard-local
 | `requirements.sh` | Linux system packages (Python, curl, …) — first time only, uses sudo |
 | `install.sh` / `install.ps1` | Installer (venv, deps, service/task, Claude Code setup) |
 | `bootstrap.sh` | One-command curl installer, Linux (root — preferred raw URL target) |
-| `bootstrap.ps1` | One-command `irm | iex` installer, Windows |
+| `bootstrap.ps1` | One-command `irm \| iex` installer, Windows |
 | `scripts/bootstrap.sh` | Thin wrapper → root `bootstrap.sh` (back-compat) |
 | `api-setup.sh` / `api-setup.ps1` | Add keys + base URL (re-run to switch provider) |
 | `uninstall.sh` / `uninstall.ps1` | Clean removal |
@@ -466,15 +623,25 @@ claude plugin marketplace remove npc-failguard-local
 | `logs/proxy.log` | Rotated daily, kept 7 days |
 | `.venv/` | Python virtualenv |
 
-`tests/` holds the pytest suite for the core (run:
-`core/.venv/bin/python -m pytest tests/ -q`).
+`tests/` holds the pytest suite and the cross-platform E2E matrices
+(`tests/e2e/matrix.sh`, `tests/e2e/matrix.ps1`, `tests/e2e/mock_provider.py`).
+Run the unit suite with `core/.venv/bin/python -m pytest tests/ -q`.
 
 ---
 
-## Limitations
+## ⚠️ Limitations
+
+Honest engineering means stating what this does **not** do:
 
 - Most providers don't expose a balance endpoint — the proxy only learns a key is dead
-  *after* a request fails.
-- Prompt caching resets across keys (each provider account has its own cache).
+  *after* a request fails. (That failed probe costs nothing, and the retry is invisible.)
+- Prompt caching resets across keys (each provider account has its own cache), so a
+  rotation can make the *next* request slightly more expensive.
 - On rotation the request body isn't rewritten: if the new key's account doesn't support
   the requested model, that request fails and the client re-issues with a supported one.
+
+---
+
+<div align="center">
+<sub>Built by <b>NPC Automators</b> · © 2026 · Proprietary, personal use only</sub>
+</div>
