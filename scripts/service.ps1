@@ -23,11 +23,11 @@ function Start-ProxyDirect {
         -WorkingDirectory $CoreDir -WindowStyle Hidden `
         -RedirectStandardOutput (Join-Path $LogDir "daemon.out") `
         -RedirectStandardError  (Join-Path $LogDir "daemon.err")
-    Write-Host "started (direct)"
+    Write-Output "started (direct)"
 }
 
 function Start-Proxy {
-    if (Get-ProxyProcess) { Write-Host "already running"; return }
+    if (Get-ProxyProcess) { Write-Output "already running"; return }
     $Vbs = Join-Path $ScriptDir "run-hidden.vbs"
     if (-not (Test-Path $Vbs)) { Start-ProxyDirect; return }
     Start-Process wscript.exe -ArgumentList "//B //Nologo `"$Vbs`""
@@ -38,7 +38,7 @@ function Start-Proxy {
         Start-Sleep -Milliseconds 500
         if (Get-ProxyProcess) { $alive = $true; break }
     }
-    if ($alive) { Write-Host "started (hidden)" } else { Start-ProxyDirect }
+    if ($alive) { Write-Output "started (hidden)" } else { Start-ProxyDirect }
 }
 
 function Stop-Proxy {
@@ -47,7 +47,7 @@ function Stop-Proxy {
     Get-ProxyProcess | ForEach-Object {
         Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue
     }
-    Write-Host "stopped"
+    Write-Output "stopped"
 }
 
 function Test-Active {
@@ -62,16 +62,16 @@ function Wait-Ready {
     for ($i = 0; $i -lt 40; $i++) {
         try {
             Invoke-RestMethod -Uri "http://127.0.0.1:$Port/_npc-failguard/status" -TimeoutSec 2 | Out-Null
-            Write-Host "ready"
+            Write-Output "ready"
             return
         } catch { Start-Sleep -Milliseconds 500 }
     }
-    Write-Host "not-ready"
+    Write-Output "not-ready"
     foreach ($f in @("daemon.out", "daemon.err")) {
         $p = Join-Path $CoreDir "logs\$f"
         if ((Test-Path $p) -and (Get-Item $p).Length -gt 0) {
-            Write-Host "--- $f (tail) ---"
-            Get-Content $p -Tail 15 | ForEach-Object { Write-Host "  $_" }
+            Write-Output "--- $f (tail) ---"
+            Get-Content $p -Tail 15 | ForEach-Object { Write-Output "  $_" }
         }
     }
     exit 1
@@ -81,7 +81,7 @@ switch ($args[0]) {
     "start"      { Start-Proxy }
     "stop"       { Stop-Proxy }
     "restart"    { Stop-Proxy; Start-Sleep 1; Start-Proxy }
-    "is-active"  { if (Test-Active) { Write-Host "active" } else { Write-Host "inactive"; exit 1 } }
+    "is-active"  { if (Test-Active) { Write-Output "active" } else { Write-Output "inactive"; exit 1 } }
     "wait-ready" { Wait-Ready }
-    default      { Write-Host "usage: service.ps1 start|stop|restart|is-active|wait-ready"; exit 2 }
+    default      { Write-Output "usage: service.ps1 start|stop|restart|is-active|wait-ready"; exit 2 }
 }

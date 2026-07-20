@@ -381,6 +381,12 @@ $OUT = cmd /c "set PSModulePath=&& powershell -NoProfile -ExecutionPolicy Bypass
 Chk G8-statusline-renders "\S" $OUT
 
 Write-Host "############ PHASE H: UNINSTALL ############"
+# kill the mock provider first: it runs on core\.venv python, and a live
+# process from the venv locks python.exe so uninstall can't delete .venv
+Get-CimInstance Win32_Process -Filter "Name like 'python%'" -ErrorAction SilentlyContinue |
+    Where-Object { $_.CommandLine -like "*mock_provider.py*" } |
+    ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
+Start-Sleep 1
 $OUT = cmd /c "set PSModulePath=&& echo.| powershell -NoProfile -ExecutionPolicy Bypass -File `"$Root\uninstall.ps1`"" 2>&1 | Out-String
 Chk H1-refuse-noninteractive "need -Yes|Cancelled" $OUT
 if (Test-Path (Join-Path $Core "keys.json")) { Chk H1c-still-installed "." "x" }
