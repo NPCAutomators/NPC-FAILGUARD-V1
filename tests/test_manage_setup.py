@@ -80,6 +80,12 @@ def test_duplicate_keys_deduped():
     assert len(manage.load_keys()) == 1
 
 
+def test_missing_keys_file_path_is_error_not_key(capsys):
+    assert manage.main(["first-setup", "https://p.example.com", "/tmp/no-such-keys.txt"]) == 1
+    assert "keys file not found" in capsys.readouterr().out
+    assert manage.load_keys() == []
+
+
 def test_add_key_without_provider_hints_setup(capsys):
     assert manage.main(["add-key", "k-lonely-key"]) == 0
     out = capsys.readouterr().out

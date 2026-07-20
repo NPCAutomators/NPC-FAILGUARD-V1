@@ -239,6 +239,10 @@ def cmd_first_setup(args) -> int:
                 except OSError as exc:
                     print(f"error: cannot read keys file {tok}: {exc}")
                     return 1
+            elif tok.lower().endswith(".txt") or os.sep in tok:
+                # clearly meant as a file path - don't silently store it as a "key"
+                print(f"error: keys file not found: {tok}")
+                return 1
             else:
                 keys.append(tok)
 
