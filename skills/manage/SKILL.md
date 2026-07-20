@@ -18,11 +18,12 @@ key returns 401/402/429/5xx, the proxy silently retries the same request with th
 key — the client (Claude Code) just sees a slightly delayed 200 and never notices.
 
 On **Linux** it runs as the systemd **user** service `npc-failguard.service`; on
-**Windows** it runs as the Task Scheduler at-logon task `NPC FailGuard`. The plugin's
+**Windows** it runs as a hidden background process autostarted by a per-user
+HKCU Run key (no admin, no console window). The plugin's
 code lives at `${CLAUDE_PLUGIN_ROOT}/core/`; the running daemon uses the same `core/`
 directory. Always control the daemon through `scripts/service.sh` (start | stop |
 restart | is-active | wait-ready) — it picks systemd, a plain background process
-(no D-Bus), or `schtasks` automatically.
+(no D-Bus), or the Windows helper (`service.ps1`) automatically.
 
 ## Quick operations
 
@@ -41,8 +42,8 @@ restart | is-active | wait-ready) — it picks systemd, a plain background proce
 | Spend / token report | `/npc-failguard:usage` | free — reads `core/stats.json`, counted passively from responses |
 | Set a credit budget | `/npc-failguard:set-budget <usd>` | free — statusline then shows `$ left`; `0` clears it |
 | Zero usage counters | `/npc-failguard:reset-usage` | free — after a credit top-up; budget kept |
-| Full setup (keys + URL) | `/npc-failguard:setup` | First-time setup / switch provider — base URL + keys in one shot, works before any key exists; free (`manage.py first-setup`) |
-| Remove everything | `/npc-failguard:uninstall` | runs `uninstall.sh --yes` after user confirms |
+| Full setup (URL and/or keys) | `/npc-failguard:setup` | Guided setup / provider switch — every argument optional; no args = show state + next steps; free (`manage.py first-setup`) |
+| Remove everything | `/npc-failguard:uninstall` | runs `uninstall.sh --yes` after user confirms — **kills this session's own API connection** (expected; warn first) |
 
 All key-management commands are thin wrappers over `core/manage.py`, which masks keys
 to their last 6 characters and **hot-reloads** the daemon via
@@ -76,6 +77,16 @@ error, so a single bad request can't burn the whole pool. Revivals are logged
 (`revive key=… -> active`), making self-healing visible in the logs.
 
 ## Troubleshooting playbook
+
+**Fresh / empty install (0 keys, no provider) — nothing here is an error**
+- Every free command works fine with zero keys and no provider: `status` reports
+  "no keys yet" + next steps, `usage` shows $0, `logs` may be empty, the proxy
+  answers 503 with a friendly "run setup / add-key" message. Relay these as
+  guidance ("here's the next step, it's free"), never as failures.
+- Setup can be done in any order, each half free: provider via
+  `/npc-failguard:setup <url>` (or `set-base-url`), keys via `/npc-failguard:add-key` /
+  `add-keys-txt`. Verify each step with `/npc-failguard:status` (free). Never
+  auto-run `/npc-failguard:health` — it costs credit; only on explicit request.
 
 **"No keys available" / 503 from the proxy**
 1. `/npc-failguard:status` — see how many keys are active vs rate_limited/exhausted/dead.
@@ -111,10 +122,12 @@ error, so a single bad request can't burn the whole pool. Revivals are logged
 
 ## Windows notes
 
-- Daemon = Task Scheduler task `NPC FailGuard` (at-logon, `pythonw.exe core\main.py`).
+- Daemon = hidden background process (`pythonw.exe core\main.py`) autostarted at logon
+  via a per-user HKCU Run key (no admin rights; older installs used a Task Scheduler
+  task, which the installer migrates away from).
   Install/uninstall via `install.ps1` / `uninstall.ps1`; setup via `api-setup.ps1`.
 - `scripts/service.sh` works from Git Bash (Claude Code's shell on Windows) and shells
-  out to `schtasks`/`powershell.exe`; `scripts/service.ps1` is the native equivalent.
+  out to `powershell.exe`; `scripts/service.ps1` is the native equivalent.
 - No systemd/journalctl — logs live in `core/logs/proxy.log` (daily rotation, 7 days).
 - The venv python is `core/.venv/Scripts/python.exe` (not `bin/python`); the slash
   commands already handle both paths.

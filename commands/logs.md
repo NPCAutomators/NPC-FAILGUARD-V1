@@ -10,7 +10,7 @@ From the file log (works on every platform):
 From the systemd journal (Linux only, may be unavailable):
 !`journalctl --user -u npc-failguard.service -n 30 --no-pager 2>/dev/null || echo "(journal unavailable)"`
 
-Summarize notable events for the user: recent rotations and why, any errors, and whether traffic is flowing normally. Call out patterns:
+Summarize notable events for the user: recent rotations and why, any errors, and whether traffic is flowing normally. Both log sources being empty is normal on a fresh install (no traffic yet) — say so, don't treat it as a problem. Reading logs is always free. Call out patterns:
 - many `throttled` => provider is busy (temporary, keys revive in ~30s)
 - `exhausted` => that key's credit is spent (revives after ~5h)
 - `unauthorized`/`dead` => a genuinely invalid key

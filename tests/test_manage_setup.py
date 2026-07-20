@@ -36,9 +36,34 @@ def test_keys_file_token_is_expanded(sandbox):
     assert len(manage.load_keys()) == 2
 
 
-def test_missing_url_or_keys_errors():
-    assert manage.main(["first-setup", "k-only-key"]) == 1
-    assert manage.main(["first-setup", "https://p.example.com"]) == 1
+def test_partial_setups_now_succeed(capsys):
+    # keys only -> stored, provider guidance shown
+    assert manage.main(["first-setup", "k-only-key"]) == 0
+    assert len(manage.load_keys()) == 1
+    out = capsys.readouterr().out
+    assert "next: set provider" in out
+    # url only -> provider set, keys guidance shown (keys kept from above)
+    assert manage.main(["first-setup", "https://p.example.com"]) == 0
+    assert config.load_provider()["base_url"] == "https://p.example.com"
+    out = capsys.readouterr().out
+    assert "setup complete" in out
+
+
+def test_no_args_shows_state_not_error(capsys):
+    assert manage.main(["first-setup"]) == 0
+    out = capsys.readouterr().out
+    assert "provider : NOT SET yet" in out
+    assert "keys     : none yet" in out
+    assert "error" not in out.lower()
+
+
+def test_url_only_refusal_leaves_keys_untouched():
+    assert manage.main(["first-setup", "https://a.example.com", "k-1"]) == 0
+    # keys given again without --replace -> refused, provider NOT switched
+    assert manage.main(["first-setup", "https://c.example.com", "k-9"]) == 2
+    assert config.load_provider()["base_url"] == "https://a.example.com"
+    keys = manage.load_keys()
+    assert len(keys) == 1 and keys[0]["key"] == "k-1"
 
 
 def test_refuses_overwrite_then_replace_works():
@@ -53,3 +78,14 @@ def test_refuses_overwrite_then_replace_works():
 def test_duplicate_keys_deduped():
     assert manage.main(["first-setup", "https://p.example.com", "k-x,k-x", "k-x"]) == 0
     assert len(manage.load_keys()) == 1
+
+
+def test_add_key_without_provider_hints_setup(capsys):
+    assert manage.main(["add-key", "k-lonely-key"]) == 0
+    out = capsys.readouterr().out
+    assert "provider NOT SET yet" in out
+    # once the provider exists, the hint disappears
+    assert manage.main(["set-base-url", "https://p.example.com"]) == 0
+    capsys.readouterr()
+    assert manage.main(["add-key", "k-second-key"]) == 0
+    assert "provider NOT SET yet" not in capsys.readouterr().out

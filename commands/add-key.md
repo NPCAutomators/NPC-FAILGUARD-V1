@@ -9,6 +9,6 @@ Adds the given key to `core/api.txt` + `keys.json` with the next `key-N` label, 
 
 !`bash -c 'PY="${CLAUDE_PLUGIN_ROOT}/core/.venv/bin/python"; [ -x "$PY" ] || PY="${CLAUDE_PLUGIN_ROOT}/core/.venv/Scripts/python.exe"; "$PY" "${CLAUDE_PLUGIN_ROOT}/core/manage.py" add-key "$1"' _ "$ARGUMENTS"`
 
-Based on the output above, tell the user whether the key was added (manage.py masks keys to their last 6 characters — never print a full key yourself either, even if the user pasted one in the command). If it was a duplicate or invalid, say so plainly. Suggest `/npc-failguard:status` (free) to see the updated pool.
+Based on the output above, tell the user whether the key was added (manage.py masks keys to their last 6 characters — never print a full key yourself either, even if the user pasted one in the command). If it was a duplicate or invalid, say so plainly. If the output notes the provider is NOT SET yet, relay that warmly: the key is safely stored, and `/npc-failguard:setup <base-url>` (free) completes the setup. Suggest `/npc-failguard:status` (free) to verify the updated pool.
 
 If no key was provided in the command arguments, ask the user for the key and re-run with it.

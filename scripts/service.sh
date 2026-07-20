@@ -2,7 +2,7 @@
 # NPC FailGuard - platform-aware service control.
 # Usage: service.sh start|stop|restart|is-active|wait-ready
 # Works with: systemd user session (Linux), no-D-Bus fallback (nohup),
-# and Windows Task Scheduler via Git Bash (schtasks).
+# and the Windows hidden daemon via Git Bash (delegates to service.ps1).
 
 set -u
 

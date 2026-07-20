@@ -14,4 +14,8 @@ Using the data above, give the user a short, clear summary:
 - which key label is currently active
 - anything needing attention (e.g. dead keys) and the exact fix — `/npc-failguard:reset` to revive, `/npc-failguard:add-keys-txt` to add more keys, or `/npc-failguard:setup` to reconfigure
 
-Keep it to a few lines. Do NOT paste the raw JSON back to the user, and never print full API keys.
+Empty-install cases are NORMAL, not errors — answer warmly, no alarm:
+- `keys` is an empty list → the proxy is healthy, just no keys yet: point to `/npc-failguard:add-key <key>` or `/npc-failguard:add-keys-txt <file>` (free).
+- proxy not responding → suggest `/npc-failguard:restart` then re-run this (both free).
+
+This command is the free verify step after ANY change — it never contacts the provider and never costs credit. Keep it to a few lines. Do NOT paste the raw JSON back to the user, and never print full API keys.

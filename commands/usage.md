@@ -13,4 +13,5 @@ Summarize for the user: total spent (and remaining vs. budget if one is set), pl
 - Token counts are exact (read from upstream responses). Dollar figures follow `core/pricing.json` — the user can edit those per-million-token rates to match their provider's billing.
 - The provider's real remaining balance can't be queried (no balance API); "remaining" is budget − spent. To set a budget: `/npc-failguard:set-budget <usd>`.
 - The same numbers appear live in the Claude Code status bar (bottom of the screen).
-- To zero the counters (e.g. after a credit top-up): run manage.py `reset-usage` — offer this if the user asks to start counting fresh.
+- To zero the counters (e.g. after a credit top-up): `/npc-failguard:reset-usage` (free) — offer this if the user asks to start counting fresh.
+- All zeros is normal on a fresh install — nothing has flowed through the proxy yet.

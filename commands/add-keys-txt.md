@@ -9,6 +9,6 @@ Appends every key found in the given file into the default `core/api.txt` + `key
 
 !`bash -c 'PY="${CLAUDE_PLUGIN_ROOT}/core/.venv/bin/python"; [ -x "$PY" ] || PY="${CLAUDE_PLUGIN_ROOT}/core/.venv/Scripts/python.exe"; "$PY" "${CLAUDE_PLUGIN_ROOT}/core/manage.py" import-txt "$1"' _ "$ARGUMENTS"`
 
-Based on the output above, tell the user how many keys were added and how many were skipped as duplicates. Never print full API keys. Suggest `/npc-failguard:status` (free) to see the updated pool.
+Based on the output above, tell the user how many keys were added and how many were skipped as duplicates. Never print full API keys. If the output notes the provider is NOT SET yet, relay that warmly: keys are safely stored, and `/npc-failguard:setup <base-url>` (free) completes the setup. Suggest `/npc-failguard:status` (free) to verify the updated pool.
 
 If no path was provided or the file wasn't found, ask the user for the correct path and re-run. If they want to REPLACE the whole pool instead of appending, point them to `/npc-failguard:replace-txt`.

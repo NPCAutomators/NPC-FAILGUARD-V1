@@ -34,6 +34,9 @@ Then open a **new** terminal, run `claude`, and add your provider + keys:
 ```
 /npc-failguard:setup <base-url> <key1 key2 ... or /path/to/keys.txt>
 ```
+Every argument is optional — run `/npc-failguard:setup` with nothing to see setup
+state and next steps, give only the URL now and add keys later (or the other way
+round). Verify anything anytime with `/npc-failguard:status` — free, zero credit.
 That's it — Claude Code now routes through the proxy, keys rotate automatically, and
 the status bar shows live spend.
 
@@ -273,7 +276,7 @@ Commands marked **free** never touch the provider (no credit used).
 | `/npc-failguard:restart` | Restart the daemon | free |
 | `/npc-failguard:reset` | Revive ALL keys (clears runtime state, hot-reload) | free |
 | `/npc-failguard:health` | Send one tiny test message end-to-end through the proxy | small credit |
-| `/npc-failguard:setup` | First-time setup / switch provider — base URL + keys in one shot, works before any key exists | free |
+| `/npc-failguard:setup` | Guided setup / provider switch — URL and/or keys, **all arguments optional**; no args = show state + next steps | free |
 | `/npc-failguard:uninstall` | Guided removal (asks for confirmation first) | free |
 
 Key changes use the daemon's **hot-reload** endpoint instead of a restart, so Claude
@@ -400,6 +403,11 @@ powershell -ExecutionPolicy Bypass -File uninstall.ps1     # add -Yes to skip co
 Both remove the service/task, generated files (venv, keys, state, logs), and revert
 only the three `settings.json` env keys the installer set — everything else in your
 settings is left untouched. Or from inside Claude Code: `/npc-failguard:uninstall`.
+
+> **Heads-up when uninstalling from inside Claude Code:** that session itself runs
+> through the proxy, so stopping the daemon cuts its API connection — the next
+> message shows an "API error". That's expected; the uninstall still completed.
+> Restart Claude Code afterwards with your own credentials (or reinstall).
 
 Remove the Claude Code plugin:
 ```bash

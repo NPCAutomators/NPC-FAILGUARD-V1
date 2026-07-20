@@ -145,8 +145,10 @@ def _is_stream(body: bytes) -> bool:
 async def forward(request: Request, path: str) -> Response:
     upstream_base = config.base_url()
     if not upstream_base:
-        return JSONResponse({"error": "npc-failguard is not configured (no provider base_url)"},
-                            status_code=503)
+        return JSONResponse(
+            {"error": "npc-failguard: no provider set yet - run "
+                      "/npc-failguard:setup <base-url> (free, no credit)"},
+            status_code=503)
 
     body = await request.body()
     wants_stream = _is_stream(body)
@@ -159,6 +161,15 @@ async def forward(request: Request, path: str) -> Response:
         async with store.lock:
             picked = store.pick()
         if picked is None:
+            async with store.lock:
+                empty_pool = len(store.entries) == 0
+            if empty_pool:
+                log.error("request rejected: no keys configured yet")
+                return JSONResponse(
+                    {"error": "npc-failguard: no API keys added yet - run "
+                              "/npc-failguard:add-key <key> or "
+                              "/npc-failguard:add-keys-txt <file> (free, no credit)"},
+                    status_code=503)
             log.error("no active keys available (retry_after=%d)", config.NO_KEYS_RETRY_AFTER)
             return JSONResponse(
                 {"error": "npc-failguard: no active keys available, all cooling down"},

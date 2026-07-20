@@ -9,4 +9,4 @@ Providers don't expose a balance API, so NPC FailGuard computes "remaining credi
 
 !`bash -c 'PY="${CLAUDE_PLUGIN_ROOT}/core/.venv/bin/python"; [ -x "$PY" ] || PY="${CLAUDE_PLUGIN_ROOT}/core/.venv/Scripts/python.exe"; "$PY" "${CLAUDE_PLUGIN_ROOT}/core/manage.py" set-budget "$1"' _ "$ARGUMENTS"`
 
-Confirm the new budget to the user and mention that the status bar and `/npc-failguard:usage` now show spent + remaining. If they just topped up credit, suggest also resetting the counters with manage.py `reset-usage` so the math starts fresh. If no amount was provided, ask how much credit their account has and re-run.
+Confirm the new budget to the user and suggest `/npc-failguard:usage` (free) to verify — the status bar and usage now show spent + remaining. If they just topped up credit, suggest also resetting the counters with `/npc-failguard:reset-usage` so the math starts fresh. If no amount was provided, ask how much credit their account has and re-run.

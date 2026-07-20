@@ -105,6 +105,14 @@ def hot_reload() -> str:
 
 # ---------- commands ----------
 
+def _provider_hint() -> str | None:
+    """One-line nudge when keys exist but no provider is set yet (free)."""
+    if load_base_url() is None:
+        return ("note: provider NOT SET yet - keys are saved but requests "
+                "can't flow until you run: setup https://api.example.com")
+    return None
+
+
 def cmd_add_key(args) -> int:
     key = args.key.strip()
     if not key:
@@ -119,6 +127,9 @@ def cmd_add_key(args) -> int:
     write_api_txt([e["key"] for e in entries])
     print(f"added {mask(key)} as key-{len(entries)} (total {len(entries)} keys)")
     print(hot_reload())
+    hint = _provider_hint()
+    if hint:
+        print(hint)
     return 0
 
 
@@ -147,6 +158,9 @@ def cmd_import_txt(args) -> int:
         msg += f", skipped {skipped} duplicates"
     print(msg)
     print(hot_reload())
+    hint = _provider_hint()
+    if hint:
+        print(hint)
     return 0
 
 
@@ -170,12 +184,44 @@ def cmd_replace_txt(args) -> int:
     reset_state()   # full replacement -> fresh state
     print(f"replaced key set with {len(entries)} keys from {args.path} (state reset)")
     print(hot_reload())
+    hint = _provider_hint()
+    if hint:
+        print(hint)
     return 0
 
 
+def load_base_url():
+    try:
+        with open(config.PROVIDER_FILE, "r", encoding="utf-8") as f:
+            return json.load(f).get("base_url") or None
+    except (OSError, ValueError):
+        return None
+
+
+def _setup_state_lines() -> list[str]:
+    """Human status of the two setup halves - all local, zero credit."""
+    url = load_base_url()
+    n = len(load_keys())
+    lines = [f"provider : {url}" if url else "provider : NOT SET yet",
+             f"keys     : {n} loaded" if n else "keys     : none yet"]
+    if url and n:
+        lines.append(f"setup complete - requests will rotate through {n} key(s).")
+    else:
+        if not url:
+            lines.append("next: set provider  ->  setup https://api.example.com")
+        if not n:
+            lines.append("next: add keys anytime  ->  add-key <key>  or  add-keys-txt <file.txt>")
+        lines.append("(all of this is free - no provider credit is used)")
+    return lines
+
+
 def cmd_first_setup(args) -> int:
-    """One-shot bootstrap: parse a mixed token list into base URL + keys
-    (tokens may arrive in any order; a token may also be a keys-file path).
+    """Guided bootstrap. EVERY argument is optional:
+      - no args       -> show setup state + what to do next (free, never errors)
+      - base URL only -> set provider now, add keys later
+      - keys only     -> store keys now, set provider later
+      - URL + keys    -> classic one-shot setup
+    Tokens arrive in any order; a token may be a keys-file path.
     Refuses to clobber an existing key set unless --replace is given."""
     url = None
     keys: list[str] = []
@@ -195,32 +241,40 @@ def cmd_first_setup(args) -> int:
                     return 1
             else:
                 keys.append(tok)
-    if url is None:
-        print("error: no base URL found - include one token starting with "
-              "http:// or https:// (e.g. https://api.example.com)")
-        return 1
-    if not keys:
-        print("error: no API keys found - pass keys (space/comma separated) "
-              "and/or a path to a keys .txt file")
-        return 1
-    existing = load_keys()
-    if existing and not args.replace:
-        print(f"already configured: {len(existing)} keys present. "
-              "Re-run with --replace to wipe and replace them "
-              "(or use add-key / add-keys-txt to append).")
-        return 2
-    seen: set[str] = set()
-    entries: list[dict] = []
-    for k in keys:
-        if k not in seen:
-            seen.add(k)
-            entries.append(new_entry(k, len(entries) + 1))
-    config.secure_write_json(config.PROVIDER_FILE, {"base_url": url})
-    save_keys(entries)
-    write_api_txt([e["key"] for e in entries])
-    reset_state()
-    print(f"first-setup done: {len(entries)} keys, base URL {url}")
+
+    # ---- nothing given: report state + guide (free, exit 0) ----
+    if url is None and not keys:
+        print("\n".join(_setup_state_lines()))
+        return 0
+
+    # refuse-to-clobber check FIRST so a refusal changes nothing at all
+    if keys:
+        existing = load_keys()
+        if existing and not args.replace:
+            print(f"already configured: {len(existing)} keys present. "
+                  "Re-run with --replace to wipe and replace them "
+                  "(or use add-key / add-keys-txt to append).")
+            return 2
+
+    if url is not None:
+        config.secure_write_json(config.PROVIDER_FILE, {"base_url": url})
+        print(f"provider set: {url}")
+
+    if keys:
+        seen: set[str] = set()
+        entries: list[dict] = []
+        for k in keys:
+            if k not in seen:
+                seen.add(k)
+                entries.append(new_entry(k, len(entries) + 1))
+        save_keys(entries)
+        write_api_txt([e["key"] for e in entries])
+        reset_state()
+        print(f"stored {len(entries)} key(s)")
+
     print(hot_reload())
+    print("--")
+    print("\n".join(_setup_state_lines()))
     return 0
 
 
@@ -321,8 +375,15 @@ def cmd_status(args) -> int:
             data = json.loads(r.read())
     except (urllib.error.URLError, OSError, ValueError) as exc:
         print(f"proxy not responding on {config.HOST}:{config.PORT} ({exc})")
+        print("free to fix: restart the daemon (scripts/service.sh restart "
+              "or /npc-failguard:restart), then re-run status")
         return 1
     keys = data.get("keys", [])
+    url = load_base_url()
+    if not keys:
+        print("proxy is up - no keys yet:")
+        print("\n".join(_setup_state_lines()))
+        return 0
     counts: dict[str, int] = {}
     current = "?"
     for k in keys:
@@ -331,6 +392,9 @@ def cmd_status(args) -> int:
             current = k["label"]
     summary = ", ".join(f"{v} {s}" for s, v in sorted(counts.items()))
     print(f"{len(keys)} keys ({summary}); current: {current}")
+    if not url:
+        print("provider : NOT SET yet - free to fix: "
+              "setup https://api.example.com (or set-base-url <url>)")
     return 0
 
 
@@ -352,10 +416,10 @@ def main(argv=None) -> int:
     s.set_defaults(fn=cmd_replace_txt)
 
     s = sub.add_parser("first-setup",
-                       help="one-shot: base URL + keys (any order, file or inline)")
+                       help="guided setup: base URL and/or keys, all optional")
     s.add_argument("--replace", action="store_true",
                    help="allow replacing an existing key set")
-    s.add_argument("tokens", nargs="+")
+    s.add_argument("tokens", nargs="*")
     s.set_defaults(fn=cmd_first_setup)
 
     s = sub.add_parser("remove-key", help="remove a key by label or last-6 chars")

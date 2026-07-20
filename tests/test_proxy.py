@@ -85,6 +85,23 @@ def test_all_keys_down_returns_503_with_retry_after(app_client):
     assert all(e["status"] == key_store.DEAD for e in proxy.store.entries)
 
 
+def test_empty_pool_says_add_keys_not_cooling_down(app_client, tmp_path):
+    # fresh install: provider set but zero keys -> friendly guidance, no Retry-After
+    proxy.store = key_store.KeyStore(keys_file=tmp_path / "none.json",
+                                     state_file=tmp_path / "none_state.json")
+    r = app_client.post("/v1/messages", json={"model": "m"})
+    assert r.status_code == 503
+    assert "add-key" in r.json()["error"]
+    assert "retry-after" not in r.headers
+
+
+def test_no_provider_says_run_setup(app_client, monkeypatch):
+    monkeypatch.setattr(config, "base_url", lambda: "")
+    r = app_client.post("/v1/messages", json={"model": "m"})
+    assert r.status_code == 503
+    assert "setup" in r.json()["error"]
+
+
 @respx.mock
 def test_rotation_cap_stops_pool_burn(app_client, monkeypatch, tmp_path):
     # 30-key pool, everything 402s -> cap must stop the cascade early

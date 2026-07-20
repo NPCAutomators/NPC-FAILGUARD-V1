@@ -9,7 +9,7 @@ allowed-tools: Bash(bash:*), Bash(curl:*)
 
 !`bash "${CLAUDE_PLUGIN_ROOT}/scripts/service.sh" restart && echo "readiness: $(bash "${CLAUDE_PLUGIN_ROOT}/scripts/service.sh" wait-ready)"`
 
-Tell the user whether the restart succeeded (readiness `ready` means the status endpoint is answering). The helper works with systemd, falls back to starting the process directly when no D-Bus user session exists, and uses the Task Scheduler task on Windows.
+Tell the user whether the restart succeeded (readiness `ready` means the status endpoint is answering). The helper works with systemd, falls back to starting the process directly when no D-Bus user session exists, and relaunches the hidden process on Windows. Suggest `/npc-failguard:status` (free, no credit) to confirm keys + provider are loaded.
 
 If it failed, inspect it with:
 - Linux: `journalctl --user -u npc-failguard.service -n 30 --no-pager`

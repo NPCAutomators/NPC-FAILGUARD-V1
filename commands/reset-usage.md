@@ -8,4 +8,4 @@ Zeroes the per-model token counts and spend in `core/stats.json` and resets the 
 
 !`bash -c 'PY="${CLAUDE_PLUGIN_ROOT}/core/.venv/bin/python"; [ -x "$PY" ] || PY="${CLAUDE_PLUGIN_ROOT}/core/.venv/Scripts/python.exe"; "$PY" "${CLAUDE_PLUGIN_ROOT}/core/manage.py" reset-usage'`
 
-Confirm to the user that the counters are zeroed and the budget was kept. If their total credit also changed, suggest `/npc-failguard:set-budget <usd>` to update it.
+Confirm to the user that the counters are zeroed and the budget was kept — suggest `/npc-failguard:usage` (free) to verify the fresh state. If their total credit also changed, suggest `/npc-failguard:set-budget <usd>` to update it.
